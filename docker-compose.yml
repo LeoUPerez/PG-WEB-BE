@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  # ─────────────────────────────────────────
+  #  PostgreSQL database
+  # ─────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: proyecto_paginas_web_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      # Persist data across container restarts
+      - postgres_data:/var/lib/postgresql/data
+      # Auto-run all *.sql files in migrations on first startup
+      - ./database/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  #  Node.js API (nodemon hot-reload)
+  # ─────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: proyecto_paginas_web_api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Override DB_HOST to point to the docker service name
+      DB_HOST: db
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      # Mount source code so nodemon picks up local changes
+      - .:/app
+      # Prevent host node_modules from overwriting the container's
+      - /app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
