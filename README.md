@@ -1,21 +1,22 @@
-# ElectroStock-BE
+# proyecto-paginas-web — Backend API
 
-REST API backend for the ElectroStock inventory management system.
+REST API for the proyecto_paginas_web system.
 Built with **Node.js**, **Express**, and **PostgreSQL**.
 
 ---
 
 ## Tech Stack
 
-| Layer       | Technology          |
-|-------------|---------------------|
-| Runtime     | Node.js 20 LTS      |
-| Framework   | Express             |
-| Database    | PostgreSQL 16 (`pg`)|
-| Environment | dotenv              |
-| CORS        | cors                |
-| Dev server  | nodemon             |
-| Container   | Docker + Compose    |
+| Layer       | Technology           |
+|-------------|----------------------|
+| Runtime     | Node.js 20 LTS       |
+| Framework   | Express              |
+| Database    | PostgreSQL 16 (`pg`) |
+| Auth        | bcrypt               |
+| Environment | dotenv               |
+| CORS        | cors                 |
+| Dev server  | nodemon              |
+| Container   | Docker + Compose     |
 
 ---
 
@@ -31,11 +32,23 @@ Built with **Node.js**, **Express**, and **PostgreSQL**.
 │   ├── config/
 │   │   └── db.js                    # PostgreSQL connection pool
 │   ├── controllers/
-│   │   └── product.controller.js
+│   │   ├── cliente.controller.js
+│   │   ├── entrenador.controller.js
+│   │   ├── permiso.controller.js
+│   │   ├── rol.controller.js
+│   │   └── usuario.controller.js
 │   ├── services/
-│   │   └── product.service.js
+│   │   ├── cliente.service.js
+│   │   ├── entrenador.service.js
+│   │   ├── permiso.service.js
+│   │   ├── rol.service.js
+│   │   └── usuario.service.js
 │   ├── routes/
-│   │   └── product.routes.js
+│   │   ├── cliente.routes.js
+│   │   ├── entrenador.routes.js
+│   │   ├── permiso.routes.js
+│   │   ├── rol.routes.js
+│   │   └── usuario.routes.js
 │   ├── middleware/
 │   │   └── errorMiddleware.js       # 404 + global error handler
 │   ├── app.js                       # Express app setup (middleware, routes)
@@ -53,72 +66,69 @@ Built with **Node.js**, **Express**, and **PostgreSQL**.
 ## Architecture
 
 The codebase follows a **3-layer architecture**: Routes → Controllers → Services.
-Each layer has a single responsibility and communicates only with the layer directly below it.
+Each layer has a single responsibility and only communicates with the layer directly below it.
 
 ```
 HTTP Request
      │
      ▼
 ┌──────────┐
-│  Routes  │  Defines endpoints and maps them to controller functions
+│  Routes  │  Defines endpoints, maps them to controller functions
 └────┬─────┘
      │
      ▼
 ┌─────────────┐
-│ Controllers │  Handles req/res, validates input, delegates to service
+│ Controllers │  Handles req/res, delegates business logic to service
 └──────┬──────┘
        │
        ▼
 ┌──────────┐
-│ Services │  Contains business logic, executes parameterized SQL via pg Pool
+│ Services │  Business logic + parameterized SQL via pg Pool
 └────┬─────┘
      │
      ▼
 ┌──────────────┐
-│  PostgreSQL  │  Database
+│  PostgreSQL  │
 └──────────────┘
 ```
 
-### Layer responsibilities
-
 **Routes** (`src/routes/`)
-Define the URL paths and HTTP methods. Each route maps to exactly one controller function. No logic lives here.
+Define URL paths and HTTP methods. No logic here.
 
 **Controllers** (`src/controllers/`)
-Receive `req` and `res`. Extract parameters, call the appropriate service method, and send the HTTP response. All `try/catch` error forwarding happens here via `next(err)`.
+Receive `req`/`res`, call the service, send the response. All errors forwarded via `next(err)`.
 
 **Services** (`src/services/`)
-Own all business logic and database interaction. Use the shared `pg` Pool from `src/config/db.js` with parameterized queries to prevent SQL injection. Return plain data objects — no awareness of HTTP.
+Own all business logic and SQL. Use parameterized queries to prevent SQL injection. Return plain data — no HTTP awareness.
 
 **Config** (`src/config/db.js`)
-Creates and exports a single shared `pg.Pool` instance, configured from environment variables.
+Single shared `pg.Pool` instance configured from environment variables.
 
-**Middleware** (`src/middleware/`)
-- `notFound` — catches any request that didn't match a route and forwards a 404 error.
-- `errorHandler` — global error responder; returns JSON with `success: false`, the error message, and the stack trace in non-production environments.
+**Middleware** (`src/middleware/errorMiddleware.js`)
+- `notFound` — 404 handler for unmatched routes.
+- `errorHandler` — global JSON error responder. Includes stack trace outside production.
 
 ---
 
 ## Database Migrations
 
-Migration files live in `database/migrations/` and are named with a numeric prefix to control execution order.
+Files in `database/migrations/` are named with a numeric prefix to control execution order.
 
 ```
 database/migrations/
-└── 001_initial_schema.sql   ← first migration, runs on DB init
+├── 001_initial_schema.sql   # roles, permisos, rol_permisos, usuarios
+└── 002_...sql               # next migration (add when needed)
 ```
 
 **How it works:**
-PostgreSQL's official Docker image automatically executes every `*.sql` file found in `/docker-entrypoint-initdb.d/` on the very first startup (when the data volume is empty). The `docker-compose.yml` mounts `./database/migrations` to that path, so all migration files run in filename order.
+The Postgres Docker image auto-executes every `*.sql` file in `/docker-entrypoint-initdb.d/` on first startup (empty volume). `docker-compose.yml` mounts `./database/migrations` to that path, so migrations run in filename order automatically.
 
-**Adding a new migration:**
-Create the next numbered file and restart the DB container with a fresh volume:
-
+**Adding a migration:**
 ```bash
-# Create the file
-touch database/migrations/002_add_categories.sql
+# 1. Create the file
+touch database/migrations/002_clientes_entrenadores.sql
 
-# Rebuild with a clean volume (WARNING: destroys existing data)
+# 2. Wipe the volume and restart (WARNING: destroys existing data)
 docker compose down -v
 docker compose up --build
 ```
@@ -129,59 +139,54 @@ docker compose up --build
 
 ### Services
 
-| Service | Container             | Port  | Description                        |
-|---------|-----------------------|-------|------------------------------------|
-| `db`    | `electrostock_db`     | 5432  | PostgreSQL 16                      |
-| `api`   | `electrostock_api`    | 3000  | Node.js API with nodemon hot-reload|
+| Service | Container                    | Port | Description                         |
+|---------|------------------------------|------|-------------------------------------|
+| `db`    | `proyecto_paginas_web_db`    | 5432 | PostgreSQL 16                       |
+| `api`   | `proyecto_paginas_web_api`   | 3000 | Node.js API with nodemon hot-reload |
 
-### How nodemon hot-reload works in Docker
+### nodemon hot-reload
 
-The `api` service mounts the entire project directory into `/app` inside the container. When you save a file locally, nodemon detects the change and restarts the Node process automatically — no rebuild required.
+The `api` service mounts the project directory into `/app` in the container. Saving a file locally triggers nodemon to restart the Node process automatically — no rebuild needed.
 
-The `node_modules` directory is kept as an anonymous volume inside the container so your local `node_modules` (macOS binaries) don't overwrite the container's Linux binaries.
+`node_modules` is kept as a separate anonymous volume inside the container so macOS binaries don't conflict with the container's Linux binaries.
 
 ---
 
 ## Getting Started
 
-### Option A — Docker Compose (recommended)
+### Docker Compose (recommended)
 
-**Prerequisites:** Docker Desktop running.
+**Prerequisite:** Docker Desktop running.
 
 ```bash
 # 1. Copy and configure environment
 cp .env.example .env
-# Edit .env — set your DB_PASSWORD. Leave DB_HOST=db for Docker.
+# Set DB_PASSWORD. Leave DB_HOST=db for Docker.
 
-# 2. Build and start all services
+# 2. Start everything
 docker compose up --build
 
-# 3. Stop all services
+# 3. Stop
 docker compose down
 
-# 4. Stop and delete the database volume (full reset)
-docker compose down -v
+# 4. Full reset (wipes DB volume, reruns migrations)
+docker compose down -v && docker compose up --build
 ```
 
-The API will be available at `http://localhost:3000`.
-PostgreSQL will be available at `localhost:5432`.
+API → `http://localhost:3000`
+PostgreSQL → `localhost:5432`
 
-### Option B — Local (without Docker)
+### Local (without Docker)
 
-**Prerequisites:** Node.js 20+ and a local PostgreSQL instance.
+**Prerequisites:** Node.js 20+ and a running PostgreSQL instance.
 
 ```bash
-# 1. Install dependencies
 npm install
-
-# 2. Copy and configure environment
 cp .env.example .env
-# Edit .env — set DB_HOST=localhost and your credentials
+# Set DB_HOST=localhost and your credentials
 
-# 3. Run migrations manually against your local DB
 psql -U postgres -d proyecto_paginas_web -f database/migrations/001_initial_schema.sql
 
-# 4. Start dev server
 npm run dev
 ```
 
@@ -191,17 +196,51 @@ npm run dev
 
 Base URL: `http://localhost:3000/api`
 
-| Method | Endpoint          | Description          |
-|--------|-------------------|----------------------|
-| GET    | `/products`       | List all products    |
-| GET    | `/products/:id`   | Get product by ID    |
-| POST   | `/products`       | Create a product     |
-| PUT    | `/products/:id`   | Update a product     |
-| DELETE | `/products/:id`   | Delete a product     |
+### Roles
+| Method | Endpoint                  | Description               |
+|--------|---------------------------|---------------------------|
+| GET    | `/roles`                  | List all roles            |
+| GET    | `/roles/:id`              | Get role by ID            |
+| POST   | `/roles`                  | Create role               |
+| PUT    | `/roles/:id`              | Update role               |
+| PATCH  | `/roles/:id/estado`       | Toggle role active state  |
+| PUT    | `/roles/:id/permisos`     | Assign permissions to role|
+
+### Permisos
+| Method | Endpoint          | Description            |
+|--------|-------------------|------------------------|
+| GET    | `/permisos`       | List all permissions   |
+| GET    | `/permisos/:id`   | Get permission by ID   |
+
+### Usuarios
+| Method | Endpoint                    | Description             |
+|--------|-----------------------------|-------------------------|
+| GET    | `/usuarios`                 | List active users       |
+| GET    | `/usuarios/:id`             | Get user by ID          |
+| POST   | `/usuarios`                 | Create user             |
+| PUT    | `/usuarios/:id`             | Update user             |
+| PATCH  | `/usuarios/:id/estado`      | Toggle user active state|
+| DELETE | `/usuarios/:id`             | Archive user            |
+
+### Clientes
+| Method | Endpoint                     | Description          |
+|--------|------------------------------|----------------------|
+| GET    | `/clientes`                  | List active clients  |
+| GET    | `/clientes/:id`              | Get client by ID     |
+| POST   | `/clientes`                  | Create client        |
+| PUT    | `/clientes/:id`              | Update client        |
+| PATCH  | `/clientes/:id/archivar`     | Archive client       |
+
+### Entrenadores
+| Method | Endpoint                        | Description            |
+|--------|---------------------------------|------------------------|
+| GET    | `/entrenadores`                 | List active trainers   |
+| GET    | `/entrenadores/:id`             | Get trainer by ID      |
+| POST   | `/entrenadores`                 | Create trainer         |
+| PUT    | `/entrenadores/:id`             | Update trainer         |
+| PATCH  | `/entrenadores/:id/archivar`    | Archive trainer        |
 
 ### Response shape
-
-All endpoints return a consistent JSON envelope:
 
 ```json
 // Success
@@ -215,12 +254,11 @@ All endpoints return a consistent JSON envelope:
 
 ## Adding a New Resource
 
-Each new resource follows the same pattern:
-
-1. `src/routes/[resource].routes.js` — define endpoints
-2. `src/controllers/[resource].controller.js` — handle req/res
-3. `src/services/[resource].service.js` — SQL queries
-4. Register the router in `src/app.js`:
+1. `src/services/[resource].service.js` — SQL queries
+2. `src/controllers/[resource].controller.js` — req/res handling
+3. `src/routes/[resource].routes.js` — endpoint definitions
+4. Register in `src/app.js`:
    ```js
    app.use('/api/[resource]', require('./routes/[resource].routes'));
    ```
+5. Add a migration if the resource needs a new table.
