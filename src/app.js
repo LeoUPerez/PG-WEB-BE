@@ -14,6 +14,7 @@ const permisoRoutes    = require('./routes/permiso.routes');
 const categoriaRoutes  = require('./routes/categoria.routes');
 const productoRoutes   = require('./routes/producto.routes');
 const proveedorRoutes  = require('./routes/proveedor.routes');
+const membresiaRoutes  = require('./routes/membresia.routes');
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.use('/api/permisos',     permisoRoutes);
 app.use('/api/categorias',   categoriaRoutes);
 app.use('/api/productos',    productoRoutes);
 app.use('/api/proveedores',  proveedorRoutes);
+app.use('/api/membresias',   membresiaRoutes);
 
 // --- Error handling (must be last) ---
 app.use(notFound);
