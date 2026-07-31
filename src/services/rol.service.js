@@ -15,6 +15,26 @@ const findById = async (id) => {
   return rows[0] || null;
 };
 
+const findByName = async (name) => {
+  const { rows } = await pool.query(
+    'SELECT * FROM roles WHERE nombre = $1',
+    [name]
+  );
+  return rows[0] || null;
+};
+
+const findPermissions = async (roleId) => {
+  const { rows } = await pool.query(
+    `SELECT p.*
+     FROM permisos p
+     INNER JOIN rol_permisos rp ON rp.permiso_id = p.id
+     WHERE rp.rol_id = $1
+     ORDER BY p.clave ASC`,
+    [roleId]
+  );
+  return rows;
+};
+
 const create = async ({ nombre, descripcion, estado = true }) => {
   const { rows } = await pool.query(
     `INSERT INTO roles (nombre, descripcion, estado)
@@ -36,7 +56,7 @@ const update = async (id, { nombre, descripcion, estado }) => {
   return rows[0] || null;
 };
 
-const cambiarEstado = async (id, estado) => {
+const toggleStatus = async (id, estado) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -46,7 +66,7 @@ const cambiarEstado = async (id, estado) => {
       [estado, id]
     );
 
-    // Si se desactiva el rol, se eliminan sus permisos asignados
+    // Deactivating a role removes all its assigned permissions
     if (!estado) {
       await client.query(
         'DELETE FROM rol_permisos WHERE rol_id = $1',
@@ -64,21 +84,21 @@ const cambiarEstado = async (id, estado) => {
   }
 };
 
-const asignarPermisos = async (rol_id, permiso_ids = []) => {
+const assignPermissions = async (roleId, permissionIds = []) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    // Reemplazar todos los permisos del rol
+    // Replace all permissions for the role
     await client.query(
       'DELETE FROM rol_permisos WHERE rol_id = $1',
-      [rol_id]
+      [roleId]
     );
 
-    for (const permiso_id of permiso_ids) {
+    for (const permissionId of permissionIds) {
       await client.query(
         'INSERT INTO rol_permisos (rol_id, permiso_id) VALUES ($1, $2)',
-        [rol_id, permiso_id]
+        [roleId, permissionId]
       );
     }
 
@@ -91,4 +111,4 @@ const asignarPermisos = async (rol_id, permiso_ids = []) => {
   }
 };
 
-module.exports = { findAll, findById, create, update, cambiarEstado, asignarPermisos };
+module.exports = { findAll, findById, findByName, findPermissions, create, update, toggleStatus, assignPermissions };

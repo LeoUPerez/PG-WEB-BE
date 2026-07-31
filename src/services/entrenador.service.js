@@ -1,10 +1,11 @@
 const pool = require('../config/db');
 
-const findAll = async () => {
+const findAll = async ({ archived = false } = {}) => {
   const { rows } = await pool.query(
     `SELECT * FROM entrenadores
-     WHERE archivado = false
-     ORDER BY apellido ASC, nombre ASC`
+     WHERE archivado = $1
+     ORDER BY apellido ASC, nombre ASC`,
+    [archived]
   );
   return rows;
 };
@@ -58,7 +59,7 @@ const update = async (id, {
   return rows[0] || null;
 };
 
-const archivar = async (id) => {
+const archive = async (id) => {
   const { rows } = await pool.query(
     `UPDATE entrenadores SET archivado = true, updated_at = NOW()
      WHERE id = $1
@@ -68,4 +69,14 @@ const archivar = async (id) => {
   return rows[0] || null;
 };
 
-module.exports = { findAll, findById, create, update, archivar };
+const unarchive = async (id) => {
+  const { rows } = await pool.query(
+    `UPDATE entrenadores SET archivado = false, updated_at = NOW()
+     WHERE id = $1
+     RETURNING id, nombre, apellido, archivado`,
+    [id]
+  );
+  return rows[0] || null;
+};
+
+module.exports = { findAll, findById, create, update, archive, unarchive };
