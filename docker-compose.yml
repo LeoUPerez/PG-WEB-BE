@@ -13,9 +13,7 @@ services:
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
-      # Persist data across container restarts
       - postgres_data:/var/lib/postgresql/data
-      # Auto-run all *.sql files in migrations on first startup
       - ./database/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
@@ -35,14 +33,11 @@ services:
     env_file:
       - .env
     environment:
-      # Override DB_HOST to point to the docker service name
       DB_HOST: db
     ports:
       - "${PORT:-3000}:3000"
     volumes:
-      # Mount source code so nodemon picks up local changes
       - .:/app
-      # Prevent host node_modules from overwriting the container's
       - /app/node_modules
     depends_on:
       db:

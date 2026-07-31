@@ -1,8 +1,10 @@
+const bcrypt = require('bcrypt');
 const usuarioService = require('../services/usuario.service');
 
 const getAll = async (req, res, next) => {
   try {
-    const data = await usuarioService.findAll();
+    const archived = req.query.archived === 'true';
+    const data = await usuarioService.findAll({ archived });
     res.json({ success: true, data });
   } catch (err) { next(err); }
 };
@@ -24,41 +26,47 @@ const create = async (req, res, next) => {
 
 const update = async (req, res, next) => {
   try {
-    const { password_actual, password_nueva, ...campos } = req.body;
+    const { password_actual, password_nueva, ...fields } = req.body;
 
-    // Handle optional password change
     if (password_nueva) {
-      const existente = await usuarioService.findByUsuario(campos.usuario);
-      if (!existente) { res.status(404); throw new Error('Usuario no encontrado'); }
+      const existing = await usuarioService.findByUsername(fields.usuario);
+      if (!existing) { res.status(404); throw new Error('Usuario no encontrado'); }
 
-      const bcrypt = require('bcrypt');
-      const valida = await bcrypt.compare(password_actual, existente.password);
-      if (!valida) { res.status(400); throw new Error('La contraseña actual es incorrecta'); }
+      const valid = await bcrypt.compare(password_actual, existing.password);
+      if (!valid) { res.status(400); throw new Error('La contraseña actual es incorrecta'); }
 
-      await usuarioService.cambiarPassword(req.params.id, password_nueva);
+      await usuarioService.changePassword(req.params.id, password_nueva);
     }
 
-    const data = await usuarioService.update(req.params.id, campos);
+    const data = await usuarioService.update(req.params.id, fields);
     if (!data) { res.status(404); throw new Error('Usuario no encontrado'); }
     res.json({ success: true, data });
   } catch (err) { next(err); }
 };
 
-const cambiarEstado = async (req, res, next) => {
+const toggleStatus = async (req, res, next) => {
   try {
     const { estado } = req.body;
-    const data = await usuarioService.cambiarEstado(req.params.id, estado);
+    const data = await usuarioService.toggleStatus(req.params.id, estado);
     if (!data) { res.status(404); throw new Error('Usuario no encontrado'); }
     res.json({ success: true, data });
   } catch (err) { next(err); }
 };
 
-const archivar = async (req, res, next) => {
+const archive = async (req, res, next) => {
   try {
-    const data = await usuarioService.archivar(req.params.id);
+    const data = await usuarioService.archive(req.params.id);
     if (!data) { res.status(404); throw new Error('Usuario no encontrado'); }
     res.json({ success: true, message: 'Usuario archivado', data });
   } catch (err) { next(err); }
 };
 
-module.exports = { getAll, getById, create, update, cambiarEstado, archivar };
+const unarchive = async (req, res, next) => {
+  try {
+    const data = await usuarioService.unarchive(req.params.id);
+    if (!data) { res.status(404); throw new Error('Usuario no encontrado'); }
+    res.json({ success: true, message: 'Usuario restaurado', data });
+  } catch (err) { next(err); }
+};
+
+module.exports = { getAll, getById, create, update, toggleStatus, archive, unarchive };

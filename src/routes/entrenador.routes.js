@@ -6,6 +6,7 @@ router.get('/', entrenadorController.getAll);
 router.get('/:id', entrenadorController.getById);
 router.post('/', entrenadorController.create);
 router.put('/:id', entrenadorController.update);
-router.patch('/:id/archivar', entrenadorController.archivar);
+router.patch('/:id/archive', entrenadorController.archive);
+router.patch('/:id/unarchive', entrenadorController.unarchive);
 
 module.exports = router;

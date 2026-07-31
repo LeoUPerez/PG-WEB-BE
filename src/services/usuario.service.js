@@ -3,12 +3,13 @@ const bcrypt = require('bcrypt');
 
 const SALT_ROUNDS = 10;
 
-const findAll = async () => {
+const findAll = async ({ archived = false } = {}) => {
   const { rows } = await pool.query(
     `SELECT id, usuario, nombre, rol, estado, archivado, created_at, updated_at
      FROM usuarios
-     WHERE archivado = false
-     ORDER BY nombre ASC`
+     WHERE archivado = $1
+     ORDER BY nombre ASC`,
+    [archived]
   );
   return rows;
 };
@@ -23,11 +24,11 @@ const findById = async (id) => {
   return rows[0] || null;
 };
 
-const findByUsuario = async (usuario) => {
+const findByUsername = async (username) => {
   // Includes password hash — only for auth use
   const { rows } = await pool.query(
     'SELECT * FROM usuarios WHERE usuario = $1',
-    [usuario]
+    [username]
   );
   return rows[0] || null;
 };
@@ -54,15 +55,15 @@ const update = async (id, { usuario, nombre, rol, estado }) => {
   return rows[0] || null;
 };
 
-const cambiarPassword = async (id, nuevaPassword) => {
-  const hash = await bcrypt.hash(nuevaPassword, SALT_ROUNDS);
+const changePassword = async (id, newPassword) => {
+  const hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
   await pool.query(
     'UPDATE usuarios SET password = $1, updated_at = NOW() WHERE id = $2',
     [hash, id]
   );
 };
 
-const cambiarEstado = async (id, estado) => {
+const toggleStatus = async (id, estado) => {
   const { rows } = await pool.query(
     `UPDATE usuarios SET estado = $1, updated_at = NOW()
      WHERE id = $2
@@ -72,9 +73,19 @@ const cambiarEstado = async (id, estado) => {
   return rows[0] || null;
 };
 
-const archivar = async (id) => {
+const archive = async (id) => {
   const { rows } = await pool.query(
     `UPDATE usuarios SET archivado = true, updated_at = NOW()
+     WHERE id = $1
+     RETURNING id, usuario, archivado`,
+    [id]
+  );
+  return rows[0] || null;
+};
+
+const unarchive = async (id) => {
+  const { rows } = await pool.query(
+    `UPDATE usuarios SET archivado = false, updated_at = NOW()
      WHERE id = $1
      RETURNING id, usuario, archivado`,
     [id]
@@ -85,10 +96,11 @@ const archivar = async (id) => {
 module.exports = {
   findAll,
   findById,
-  findByUsuario,
+  findByUsername,
   create,
   update,
-  cambiarPassword,
-  cambiarEstado,
-  archivar,
+  changePassword,
+  toggleStatus,
+  archive,
+  unarchive,
 };
