@@ -1,0 +1,4 @@
+BEGIN;
+SET search_path TO gym;
+DROP TABLE IF EXISTS customers CASCADE;
+COMMIT;

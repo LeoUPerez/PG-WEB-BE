@@ -1,0 +1,4 @@
+BEGIN;
+SET search_path TO gym;
+DROP TABLE IF EXISTS trainers CASCADE;
+COMMIT;

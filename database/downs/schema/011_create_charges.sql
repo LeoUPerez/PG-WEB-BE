@@ -1,0 +1,5 @@
+BEGIN;
+SET search_path TO gym;
+DROP TABLE IF EXISTS charges CASCADE;
+DROP TABLE IF EXISTS charge_types CASCADE;
+COMMIT;

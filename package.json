@@ -5,7 +5,9 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "migrate": "bash scripts/migrate-schema.sh",
+    "migrate:undo": "bash scripts/migrate-schema-undo.sh"
   },
   "keywords": [],
   "author": "",

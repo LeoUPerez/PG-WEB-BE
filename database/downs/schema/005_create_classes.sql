@@ -1,0 +1,7 @@
+BEGIN;
+SET search_path TO gym;
+DROP TABLE IF EXISTS attendances CASCADE;
+DROP TABLE IF EXISTS class_reservations CASCADE;
+DROP TABLE IF EXISTS class_schedules CASCADE;
+DROP TABLE IF EXISTS classes CASCADE;
+COMMIT;

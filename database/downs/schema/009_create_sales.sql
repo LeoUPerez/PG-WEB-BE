@@ -1,0 +1,5 @@
+BEGIN;
+SET search_path TO gym;
+DROP TABLE IF EXISTS sale_details CASCADE;
+DROP TABLE IF EXISTS sales CASCADE;
+COMMIT;
