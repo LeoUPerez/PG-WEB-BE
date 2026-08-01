@@ -25,15 +25,17 @@ const create = async ({
   email,
   telefono,
   especialidad,
+  horario,
+  fecha_contratacion,
   foto,
   estado = 'Activo',
 }) => {
   const { rows } = await pool.query(
     `INSERT INTO entrenadores
-       (nombre, apellido, cedula, email, telefono, especialidad, foto, estado, archivado)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false)
+       (nombre, apellido, cedula, email, telefono, especialidad, horario, fecha_contratacion, foto, estado, archivado)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false)
      RETURNING *`,
-    [nombre, apellido, cedula, email, telefono, especialidad, foto, estado]
+    [nombre, apellido, cedula, email, telefono, especialidad, horario || null, fecha_contratacion || null, foto, estado]
   );
   return rows[0];
 };
@@ -45,16 +47,19 @@ const update = async (id, {
   email,
   telefono,
   especialidad,
+  horario,
+  fecha_contratacion,
   foto,
   estado,
 }) => {
   const { rows } = await pool.query(
     `UPDATE entrenadores
      SET nombre = $1, apellido = $2, cedula = $3, email = $4, telefono = $5,
-         especialidad = $6, foto = $7, estado = $8, updated_at = NOW()
-     WHERE id = $9
+         especialidad = $6, horario = $7, fecha_contratacion = $8, foto = $9, estado = $10,
+         updated_at = NOW()
+     WHERE id = $11
      RETURNING *`,
-    [nombre, apellido, cedula, email, telefono, especialidad, foto, estado, id]
+    [nombre, apellido, cedula, email, telefono, especialidad, horario || null, fecha_contratacion || null, foto, estado, id]
   );
   return rows[0] || null;
 };
