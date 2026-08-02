@@ -1,0 +1,4 @@
+# Fuerza LF en scripts de shell, sin importar la configuración de
+# autocrlf de cada quien (evita el error "$'\r': command not found"
+# al correr scripts/migrate.sh en Windows).
+*.sh text eol=lf
