@@ -6,6 +6,7 @@ const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
 // --- Route imports ---
 const authRoutes       = require('./routes/auth.routes');
+const claseRoutes      = require('./routes/clase.routes');
 const rolRoutes        = require('./routes/rol.routes');
 const usuarioRoutes    = require('./routes/usuario.routes');
 const clienteRoutes    = require('./routes/cliente.routes');
@@ -28,7 +29,8 @@ app.get('/', (req, res) => {
   res.json({ message: 'ElectroStock API is running' });
 });
 
-app.use('/api/auth',        authRoutes);
+app.use('/api/auth',         authRoutes);
+app.use('/api/clases',      claseRoutes);
 app.use('/api/roles',       rolRoutes);
 app.use('/api/usuarios',    usuarioRoutes);
 app.use('/api/clientes',    clienteRoutes);
