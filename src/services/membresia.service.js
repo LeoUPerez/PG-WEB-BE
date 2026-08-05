@@ -2,7 +2,7 @@ const pool = require('../config/db');
 
 const SELECT_COLS = `
   id, nombre, descripcion, duracion_dias, precio,
-  estado, archivado, created_at, updated_at
+  estado, destacado, archivado, created_at, updated_at
 `;
 
 const findAll = async ({ archived = false } = {}) => {
@@ -31,13 +31,14 @@ const create = async ({
   duracion_dias,
   precio = 0,
   estado = 'Activo',
+  destacado = false,
 }) => {
   const { rows } = await pool.query(
     `INSERT INTO membresias
-       (nombre, descripcion, duracion_dias, precio, estado, archivado)
-     VALUES ($1, $2, $3, $4, $5, false)
+       (nombre, descripcion, duracion_dias, precio, estado, destacado, archivado)
+     VALUES ($1, $2, $3, $4, $5, $6, false)
      RETURNING ${SELECT_COLS}`,
-    [nombre, descripcion || null, duracion_dias, precio, estado]
+    [nombre, descripcion || null, duracion_dias, precio, estado, !!destacado]
   );
   return rows[0];
 };
@@ -48,14 +49,15 @@ const update = async (id, {
   duracion_dias,
   precio,
   estado,
+  destacado = false,
 }) => {
   const { rows } = await pool.query(
     `UPDATE membresias
      SET nombre = $1, descripcion = $2, duracion_dias = $3,
-         precio = $4, estado = $5, updated_at = NOW()
-     WHERE id = $6
+         precio = $4, estado = $5, destacado = $6, updated_at = NOW()
+     WHERE id = $7
      RETURNING ${SELECT_COLS}`,
-    [nombre, descripcion || null, duracion_dias, precio, estado, id]
+    [nombre, descripcion || null, duracion_dias, precio, estado, !!destacado, id]
   );
   return rows[0] || null;
 };
