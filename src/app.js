@@ -16,6 +16,7 @@ const categoriaRoutes  = require('./routes/categoria.routes');
 const productoRoutes   = require('./routes/producto.routes');
 const proveedorRoutes  = require('./routes/proveedor.routes');
 const membresiaRoutes  = require('./routes/membresia.routes');
+const horarioRoutes    = require('./routes/horario.routes');
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use('/api/categorias',   categoriaRoutes);
 app.use('/api/productos',    productoRoutes);
 app.use('/api/proveedores',  proveedorRoutes);
 app.use('/api/membresias',   membresiaRoutes);
+app.use('/api/horarios-clases', horarioRoutes);
 
 // --- Error handling (must be last) ---
 app.use(notFound);
