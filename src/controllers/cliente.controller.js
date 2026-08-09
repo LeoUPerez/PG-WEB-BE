@@ -3,8 +3,22 @@ const clienteService = require('../services/cliente.service');
 const getAll = async (req, res, next) => {
   try {
     const archived = req.query.archived === 'true';
-    const data = await clienteService.findAll({ archived });
-    res.json({ success: true, data });
+    const paginated = req.query.page !== undefined || req.query.limit !== undefined;
+    const result = await clienteService.findAll({
+      archived,
+      page: paginated ? req.query.page : null,
+      limit: paginated ? req.query.limit : null,
+      search: String(req.query.search || '').trim(),
+      estado: ['Activo', 'Inactivo'].includes(req.query.estado) ? req.query.estado : '',
+      sexo: ['M', 'F'].includes(req.query.sexo) ? req.query.sexo : '',
+    });
+
+    if (paginated) {
+      res.json({ success: true, ...result });
+      return;
+    }
+
+    res.json({ success: true, data: result });
   } catch (err) { next(err); }
 };
 

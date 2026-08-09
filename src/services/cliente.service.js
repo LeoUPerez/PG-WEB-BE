@@ -1,13 +1,87 @@
 const pool = require('../config/db');
 
-const findAll = async ({ archived = false } = {}) => {
+const findAll = async ({
+  archived = false,
+  page = null,
+  limit = null,
+  search = '',
+  estado = '',
+  sexo = '',
+} = {}) => {
+  const params = [archived];
+  const conditions = ['archivado = $1'];
+
+  if (search) {
+    params.push(`%${search}%`);
+    const position = params.length;
+    conditions.push(`(
+      CONCAT_WS(' ', nombre, apellido) ILIKE $${position}
+      OR cedula ILIKE $${position}
+      OR email ILIKE $${position}
+      OR telefono ILIKE $${position}
+    )`);
+  }
+
+  if (estado) {
+    params.push(estado);
+    conditions.push(`estado = $${params.length}`);
+  }
+
+  if (sexo) {
+    params.push(sexo);
+    conditions.push(`sexo = $${params.length}`);
+  }
+
+  const where = conditions.join(' AND ');
+  const paginated = page !== null || limit !== null;
+
+  if (!paginated) {
+    const { rows } = await pool.query(
+      `SELECT * FROM clientes
+       WHERE ${where}
+       ORDER BY apellido ASC, nombre ASC`,
+      params
+    );
+    return rows;
+  }
+
+  const safeLimit = Math.min(Math.max(Number(limit) || 15, 1), 100);
+  const requestedPage = Math.max(Number(page) || 1, 1);
+  const countResult = await pool.query(
+    `SELECT
+       COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE estado = 'Activo')::int AS activos,
+       COUNT(*) FILTER (WHERE estado = 'Inactivo')::int AS inactivos
+     FROM clientes
+     WHERE ${where}`,
+    params
+  );
+
+  const stats = countResult.rows[0];
+  const totalPages = Math.max(Math.ceil(stats.total / safeLimit), 1);
+  const currentPage = Math.min(requestedPage, totalPages);
+  const offset = (currentPage - 1) * safeLimit;
+  const dataParams = [...params, safeLimit, offset];
+  const limitPosition = dataParams.length - 1;
+  const offsetPosition = dataParams.length;
   const { rows } = await pool.query(
     `SELECT * FROM clientes
-     WHERE archivado = $1
-     ORDER BY apellido ASC, nombre ASC`,
-    [archived]
+     WHERE ${where}
+     ORDER BY apellido ASC, nombre ASC
+     LIMIT $${limitPosition} OFFSET $${offsetPosition}`,
+    dataParams
   );
-  return rows;
+
+  return {
+    data: rows,
+    pagination: {
+      page: currentPage,
+      limit: safeLimit,
+      total: stats.total,
+      totalPages,
+    },
+    stats,
+  };
 };
 
 const findById = async (id) => {
