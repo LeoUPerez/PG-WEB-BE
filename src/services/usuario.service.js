@@ -5,7 +5,7 @@ const SALT_ROUNDS = 10;
 
 const findAll = async ({ archived = false } = {}) => {
   const { rows } = await pool.query(
-    `SELECT id, usuario, nombre, rol, estado, archivado, created_at, updated_at
+    `SELECT id, usuario, nombre, email, rol, estado, archivado, created_at, updated_at
      FROM usuarios
      WHERE archivado = $1
      ORDER BY nombre ASC`,
@@ -16,7 +16,7 @@ const findAll = async ({ archived = false } = {}) => {
 
 const findById = async (id) => {
   const { rows } = await pool.query(
-    `SELECT id, usuario, nombre, rol, estado, archivado, created_at, updated_at
+    `SELECT id, usuario, nombre, email, rol, estado, archivado, created_at, updated_at
      FROM usuarios
      WHERE id = $1`,
     [id]
@@ -33,24 +33,24 @@ const findByUsername = async (username) => {
   return rows[0] || null;
 };
 
-const create = async ({ usuario, nombre, password, rol, estado = true }) => {
+const create = async ({ usuario, nombre, email, password, rol, estado = true }) => {
   const hash = await bcrypt.hash(password, SALT_ROUNDS);
   const { rows } = await pool.query(
-    `INSERT INTO usuarios (usuario, nombre, password, rol, estado, archivado)
-     VALUES ($1, $2, $3, $4, $5, false)
-     RETURNING id, usuario, nombre, rol, estado, archivado, created_at, updated_at`,
-    [usuario, nombre, hash, rol, estado]
+    `INSERT INTO usuarios (usuario, nombre, email, password, rol, estado, archivado)
+     VALUES ($1, $2, $3, $4, $5, $6, false)
+     RETURNING id, usuario, nombre, email, rol, estado, archivado, created_at, updated_at`,
+    [usuario, nombre, email || null, hash, rol, estado]
   );
   return rows[0];
 };
 
-const update = async (id, { usuario, nombre, rol, estado }) => {
+const update = async (id, { usuario, nombre, email, rol, estado }) => {
   const { rows } = await pool.query(
     `UPDATE usuarios
-     SET usuario = $1, nombre = $2, rol = $3, estado = $4, updated_at = NOW()
-     WHERE id = $5
-     RETURNING id, usuario, nombre, rol, estado, archivado, created_at, updated_at`,
-    [usuario, nombre, rol, estado, id]
+     SET usuario = $1, nombre = $2, email = $3, rol = $4, estado = $5, updated_at = NOW()
+     WHERE id = $6
+     RETURNING id, usuario, nombre, email, rol, estado, archivado, created_at, updated_at`,
+    [usuario, nombre, email || null, rol, estado, id]
   );
   return rows[0] || null;
 };
