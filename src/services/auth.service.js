@@ -26,13 +26,13 @@ const login = async (usuario, password) => {
   return { ok: true, usuario: usuarioSeguro };
 };
 
-const solicitarRecuperacion = async (usuario) => {
+const solicitarRecuperacion = async (email) => {
   const { rows } = await pool.query(
-    'SELECT * FROM usuarios WHERE usuario = $1',
-    [usuario]
+    'SELECT * FROM usuarios WHERE email = $1',
+    [email]
   );
 
-  if (rows.length === 0) return { ok: false, mensaje: 'No existe un usuario con ese nombre de usuario' };
+  if (rows.length === 0) return { ok: false, mensaje: 'No existe un usuario con ese correo' };
 
   const user = rows[0];
   if (user.archivado) return { ok: false, mensaje: 'Este usuario ha sido archivado. Contacte al administrador.' };
@@ -67,10 +67,10 @@ const solicitarRecuperacion = async (usuario) => {
   return { ok: true, token, ttl_minutos: RESET_TOKEN_TTL_MINUTOS };
 };
 
-const restablecerPassword = async (usuario, token, nuevaPassword) => {
+const buscarTokenValido = async (email, token) => {
   const { rows: usuarios } = await pool.query(
-    'SELECT * FROM usuarios WHERE usuario = $1',
-    [usuario]
+    'SELECT * FROM usuarios WHERE email = $1',
+    [email]
   );
   if (usuarios.length === 0) return { ok: false, mensaje: 'Código inválido o expirado' };
   const user = usuarios[0];
@@ -83,7 +83,20 @@ const restablecerPassword = async (usuario, token, nuevaPassword) => {
   );
   if (rows.length === 0) return { ok: false, mensaje: 'Código inválido o expirado' };
 
-  const reset = rows[0];
+  return { ok: true, user, reset: rows[0] };
+};
+
+const verificarCodigo = async (email, token) => {
+  const resultado = await buscarTokenValido(email, token);
+  if (!resultado.ok) return resultado;
+  return { ok: true };
+};
+
+const restablecerPassword = async (email, token, nuevaPassword) => {
+  const resultado = await buscarTokenValido(email, token);
+  if (!resultado.ok) return resultado;
+  const { user, reset } = resultado;
+
   const hash = await bcrypt.hash(nuevaPassword, 10);
 
   await pool.query('UPDATE usuarios SET password = $1, updated_at = NOW() WHERE id = $2', [hash, user.id]);
@@ -92,4 +105,4 @@ const restablecerPassword = async (usuario, token, nuevaPassword) => {
   return { ok: true };
 };
 
-module.exports = { login, solicitarRecuperacion, restablecerPassword };
+module.exports = { login, solicitarRecuperacion, verificarCodigo, restablecerPassword };

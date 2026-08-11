@@ -22,12 +22,12 @@ const login = async (req, res, next) => {
 
 const solicitarRecuperacion = async (req, res, next) => {
   try {
-    const { usuario } = req.body;
-    if (!usuario) {
-      return res.status(400).json({ ok: false, mensaje: 'El usuario es requerido' });
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ ok: false, mensaje: 'El correo es requerido' });
     }
 
-    const resultado = await authService.solicitarRecuperacion(usuario);
+    const resultado = await authService.solicitarRecuperacion(email);
 
     if (!resultado.ok) {
       return res.status(404).json({ ok: false, mensaje: resultado.mensaje });
@@ -44,17 +44,14 @@ const solicitarRecuperacion = async (req, res, next) => {
   }
 };
 
-const restablecerPassword = async (req, res, next) => {
+const verificarCodigo = async (req, res, next) => {
   try {
-    const { usuario, token, password } = req.body;
-    if (!usuario || !token || !password) {
-      return res.status(400).json({ ok: false, mensaje: 'Usuario, código y nueva contraseña son requeridos' });
-    }
-    if (String(password).length < 6) {
-      return res.status(400).json({ ok: false, mensaje: 'La contraseña debe tener al menos 6 caracteres' });
+    const { email, token } = req.body;
+    if (!email || !token) {
+      return res.status(400).json({ ok: false, mensaje: 'Correo y código son requeridos' });
     }
 
-    const resultado = await authService.restablecerPassword(usuario, token, password);
+    const resultado = await authService.verificarCodigo(email, token);
     if (!resultado.ok) {
       return res.status(400).json({ ok: false, mensaje: resultado.mensaje });
     }
@@ -65,4 +62,25 @@ const restablecerPassword = async (req, res, next) => {
   }
 };
 
-module.exports = { login, solicitarRecuperacion, restablecerPassword };
+const restablecerPassword = async (req, res, next) => {
+  try {
+    const { email, token, password } = req.body;
+    if (!email || !token || !password) {
+      return res.status(400).json({ ok: false, mensaje: 'Correo, código y nueva contraseña son requeridos' });
+    }
+    if (String(password).length < 6) {
+      return res.status(400).json({ ok: false, mensaje: 'La contraseña debe tener al menos 6 caracteres' });
+    }
+
+    const resultado = await authService.restablecerPassword(email, token, password);
+    if (!resultado.ok) {
+      return res.status(400).json({ ok: false, mensaje: resultado.mensaje });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { login, solicitarRecuperacion, verificarCodigo, restablecerPassword };
