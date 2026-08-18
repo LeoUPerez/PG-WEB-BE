@@ -1,0 +1,11 @@
+const { Router } = require('express');
+const router = Router();
+const cobroController = require('../controllers/cobro.controller');
+
+router.get('/', cobroController.getAll);
+router.get('/metodos-pago', cobroController.getMetodosPago);
+router.get('/cliente/:clienteId/pendientes', cobroController.getPendientesByCliente);
+router.get('/:id', cobroController.getById);
+router.post('/', cobroController.create);
+
+module.exports = router;
