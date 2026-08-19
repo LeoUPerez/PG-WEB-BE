@@ -7,5 +7,6 @@ router.get('/metodos-pago', cobroController.getMetodosPago);
 router.get('/cliente/:clienteId/pendientes', cobroController.getPendientesByCliente);
 router.get('/:id', cobroController.getById);
 router.post('/', cobroController.create);
+router.patch('/:id/anular', cobroController.anular);
 
 module.exports = router;

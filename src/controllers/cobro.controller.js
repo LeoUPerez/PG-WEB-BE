@@ -44,4 +44,15 @@ const create = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, getById, getPendientesByCliente, getMetodosPago, create };
+const anular = async (req, res, next) => {
+  try {
+    const data = await cobroService.anular(req.params.id);
+    if (!data) { res.status(404); throw new Error('Cobro no encontrado'); }
+    res.json({ success: true, message: 'Cobro anulado', data });
+  } catch (err) {
+    if (err.status) res.status(err.status);
+    next(err);
+  }
+};
+
+module.exports = { getAll, getById, getPendientesByCliente, getMetodosPago, create, anular };

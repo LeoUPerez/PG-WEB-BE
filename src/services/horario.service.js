@@ -62,6 +62,33 @@ const create = async ({
   return findById(rows[0].id);
 };
 
+const createBulk = async ({ clase_id, entrenador_id, estado = 'Activo', dias }) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const ids = [];
+    for (const d of dias) {
+      const { rows } = await client.query(
+        `INSERT INTO horarios_clases
+           (clase_id, entrenador_id, dia, hora_inicio, hora_fin, estado, archivado)
+         VALUES ($1, $2, $3, $4, $5, $6, false)
+         RETURNING id`,
+        [clase_id, entrenador_id, d.dia, d.hora_inicio, d.hora_fin, estado]
+      );
+      ids.push(rows[0].id);
+    }
+    await client.query('COMMIT');
+    const creados = [];
+    for (const id of ids) creados.push(await findById(id));
+    return creados;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 const update = async (id, {
   clase_id,
   entrenador_id,
@@ -114,6 +141,7 @@ module.exports = {
   findAll,
   findById,
   create,
+  createBulk,
   update,
   toggleStatus,
   archive,

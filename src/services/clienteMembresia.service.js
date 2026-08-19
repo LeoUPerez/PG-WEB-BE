@@ -29,7 +29,31 @@ const findActivaByCliente = async (clienteId) => {
   return rows[0] || null;
 };
 
-const create = async ({ cliente_id, membresia_id, fecha_inicio }) => {
+const findUltimaByCliente = async (clienteId) => {
+  const { rows } = await pool.query(
+    `${SELECT_JOIN} WHERE cm.cliente_id = $1
+     ORDER BY cm.created_at DESC, cm.id DESC LIMIT 1`,
+    [clienteId]
+  );
+  return rows[0] || null;
+};
+
+const findUltimaPorCliente = async () => {
+  const { rows } = await pool.query(
+    `SELECT DISTINCT ON (cm.cliente_id) cm.id, cm.cliente_id, cm.membresia_id, cm.fecha_inicio, cm.fecha_vencimiento,
+            cm.precio, cm.estado, cm.created_at, cm.updated_at,
+            c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.cedula AS cliente_cedula,
+            m.nombre AS membresia_nombre, m.duracion_dias AS membresia_duracion_dias
+     FROM cliente_membresias cm
+     JOIN clientes c ON c.id = cm.cliente_id
+     JOIN membresias m ON m.id = cm.membresia_id
+     WHERE c.archivado = false
+     ORDER BY cm.cliente_id, cm.created_at DESC, cm.id DESC`
+  );
+  return rows;
+};
+
+const create = async ({ cliente_id, membresia_id, fecha_inicio, confirmar_reemplazo }) => {
   const { rows: clienteRows } = await pool.query(
     'SELECT * FROM clientes WHERE id = $1',
     [cliente_id]
@@ -50,19 +74,43 @@ const create = async ({ cliente_id, membresia_id, fecha_inicio }) => {
     const err = new Error('La membresía no está activa'); err.status = 400; throw err;
   }
 
+  const activa = await findActivaByCliente(cliente_id);
+  if (activa && !confirmar_reemplazo) {
+    const err = new Error('Este cliente ya tiene una membresía activa.');
+    err.status = 409;
+    err.requiereConfirmacion = true;
+    err.membresiaActual = activa;
+    throw err;
+  }
+
   const inicio = new Date(fecha_inicio);
   const vencimiento = new Date(inicio);
   vencimiento.setDate(vencimiento.getDate() + Number(membresia.duracion_dias));
   const fechaVencimientoStr = vencimiento.toISOString().slice(0, 10);
 
-  const { rows } = await pool.query(
-    `INSERT INTO cliente_membresias (cliente_id, membresia_id, fecha_inicio, fecha_vencimiento, precio)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id`,
-    [cliente_id, membresia_id, fecha_inicio, fechaVencimientoStr, membresia.precio]
-  );
-
-  return findById(rows[0].id);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    if (activa) {
+      await client.query(
+        `UPDATE cliente_membresias SET estado = 'Cancelada', updated_at = NOW() WHERE id = $1`,
+        [activa.id]
+      );
+    }
+    const { rows } = await client.query(
+      `INSERT INTO cliente_membresias (cliente_id, membresia_id, fecha_inicio, fecha_vencimiento, precio)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id`,
+      [cliente_id, membresia_id, fecha_inicio, fechaVencimientoStr, membresia.precio]
+    );
+    await client.query('COMMIT');
+    return findById(rows[0].id);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
 const cancelar = async (id) => {
@@ -76,4 +124,4 @@ const cancelar = async (id) => {
   return findById(rows[0].id);
 };
 
-module.exports = { findAll, findById, findActivaByCliente, create, cancelar };
+module.exports = { findAll, findById, findActivaByCliente, findUltimaByCliente, findUltimaPorCliente, create, cancelar };

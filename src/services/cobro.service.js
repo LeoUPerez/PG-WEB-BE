@@ -107,4 +107,40 @@ const create = async ({ cliente_id, metodo_pago_id, cargo_ids }) => {
   return findById(id);
 };
 
-module.exports = { findAll, findById, findPendientesByCliente, findMetodosPago, create };
+const anular = async (id) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows: cobroRows } = await client.query('SELECT * FROM cobros WHERE id = $1 FOR UPDATE', [id]);
+    const cobro = cobroRows[0];
+    if (!cobro) { await client.query('ROLLBACK'); return null; }
+    if (cobro.estado !== 'Completado') {
+      const err = new Error('Solo se pueden anular cobros completados'); err.status = 400; throw err;
+    }
+
+    const { rows: detalleRows } = await client.query(
+      'SELECT cargo_id FROM cobro_detalle WHERE cobro_id = $1 AND cargo_id IS NOT NULL',
+      [id]
+    );
+    for (const d of detalleRows) {
+      await client.query(
+        "UPDATE cargos SET estado = 'Pendiente', updated_at = NOW() WHERE id = $1 AND estado = 'Pagado'",
+        [d.cargo_id]
+      );
+    }
+
+    await client.query("UPDATE cobros SET estado = 'Anulado', updated_at = NOW() WHERE id = $1", [id]);
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  return findById(id);
+};
+
+module.exports = { findAll, findById, findPendientesByCliente, findMetodosPago, create, anular };
