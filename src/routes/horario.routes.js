@@ -5,6 +5,7 @@ const horarioController = require('../controllers/horario.controller');
 router.get('/',                 horarioController.getAll);
 router.get('/:id',              horarioController.getById);
 router.post('/',                horarioController.create);
+router.post('/bulk',            horarioController.createBulk);
 router.put('/:id',              horarioController.update);
 router.patch('/:id/status',     horarioController.toggleStatus);
 router.patch('/:id/archive',    horarioController.archive);

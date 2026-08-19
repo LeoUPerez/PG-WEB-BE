@@ -30,16 +30,41 @@ const getActivaByCliente = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const getUltimaByCliente = async (req, res, next) => {
+  try {
+    const data = await clienteMembresiaService.findUltimaByCliente(req.params.clienteId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+const getUltimaPorCliente = async (req, res, next) => {
+  try {
+    const data = await clienteMembresiaService.findUltimaPorCliente();
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
 const create = async (req, res, next) => {
   try {
     const { cliente_id, membresia_id, fecha_inicio } = req.body;
+    const confirmar_reemplazo = req.body.confirmar_reemplazo === true
+      || req.body.confirmar_reemplazo === 'true'
+      || req.body.confirmar_reemplazo === '1';
     if (!cliente_id || !membresia_id || !fecha_inicio) {
       res.status(400);
       throw new Error('Cliente, membresía y fecha de inicio son requeridos');
     }
-    const data = await clienteMembresiaService.create({ cliente_id, membresia_id, fecha_inicio });
+    const data = await clienteMembresiaService.create({ cliente_id, membresia_id, fecha_inicio, confirmar_reemplazo });
     res.status(201).json({ success: true, data });
   } catch (err) {
+    if (err.requiereConfirmacion) {
+      return res.status(409).json({
+        success: false,
+        requiereConfirmacion: true,
+        membresiaActual: err.membresiaActual,
+        message: err.message,
+      });
+    }
     if (err.status) res.status(err.status);
     next(err);
   }
@@ -53,4 +78,4 @@ const cancelar = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { getAll, getById, getActivaByCliente, create, cancelar };
+module.exports = { getAll, getById, getActivaByCliente, getUltimaByCliente, getUltimaPorCliente, create, cancelar };

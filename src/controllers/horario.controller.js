@@ -23,6 +23,18 @@ const create = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const createBulk = async (req, res, next) => {
+  try {
+    const { clase_id, entrenador_id, estado, dias } = req.body;
+    if (!clase_id || !entrenador_id || !Array.isArray(dias) || dias.length === 0) {
+      res.status(400);
+      throw new Error('Clase, entrenador y al menos un día son requeridos');
+    }
+    const data = await horarioService.createBulk({ clase_id, entrenador_id, estado, dias });
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
 const update = async (req, res, next) => {
   try {
     const data = await horarioService.update(req.params.id, req.body);
@@ -56,4 +68,4 @@ const unarchive = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { getAll, getById, create, update, toggleStatus, archive, unarchive };
+module.exports = { getAll, getById, create, createBulk, update, toggleStatus, archive, unarchive };
