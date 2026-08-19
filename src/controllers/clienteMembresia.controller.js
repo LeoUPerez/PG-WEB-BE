@@ -1,9 +1,17 @@
 const clienteMembresiaService = require('../services/clienteMembresia.service');
+const { parseListQuery, sendList } = require('../utils/pagination');
 
 const getAll = async (req, res, next) => {
   try {
-    const data = await clienteMembresiaService.findAll();
-    res.json({ success: true, data });
+    const { paginated, page, limit, search } = parseListQuery(req.query);
+    const result = await clienteMembresiaService.findAll({
+      page,
+      limit,
+      search,
+      estado: ['Activa', 'Cancelada'].includes(req.query.estado) ? req.query.estado : '',
+      vigencia: ['vigente', 'por_vencer', 'vencida'].includes(req.query.vigencia) ? req.query.vigencia : '',
+    });
+    sendList(res, result, paginated);
   } catch (err) { next(err); }
 };
 

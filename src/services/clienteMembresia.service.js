@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { runPagedFind } = require('../utils/pagination');
 
 const SELECT_JOIN = `
   SELECT cm.id, cm.cliente_id, cm.membresia_id, cm.fecha_inicio, cm.fecha_vencimiento,
@@ -10,9 +11,67 @@ const SELECT_JOIN = `
   JOIN membresias m ON m.id = cm.membresia_id
 `;
 
-const findAll = async () => {
-  const { rows } = await pool.query(`${SELECT_JOIN} ORDER BY cm.created_at DESC`);
-  return rows;
+const VIGENCIA_SQL = `
+  CASE
+    WHEN cm.estado = 'Cancelada' THEN 'cancelada'
+    WHEN cm.fecha_vencimiento < CURRENT_DATE THEN 'vencida'
+    WHEN cm.fecha_vencimiento <= CURRENT_DATE + INTERVAL '7 days' THEN 'por_vencer'
+    ELSE 'vigente'
+  END
+`;
+
+const findAll = async ({
+  page = null,
+  limit = null,
+  search = '',
+  estado = '',
+  vigencia = '',
+} = {}) => {
+  const params = [];
+  const conditions = ['TRUE'];
+
+  if (search) {
+    params.push(`%${search}%`);
+    conditions.push(`(
+      CONCAT_WS(' ', c.nombre, c.apellido) ILIKE $${params.length}
+      OR c.cedula ILIKE $${params.length}
+      OR m.nombre ILIKE $${params.length}
+    )`);
+  }
+
+  if (estado) {
+    params.push(estado);
+    conditions.push(`cm.estado = $${params.length}`);
+  }
+
+  if (vigencia === 'vigente') {
+    conditions.push(`cm.estado = 'Activa' AND cm.fecha_vencimiento >= CURRENT_DATE`);
+  } else if (vigencia === 'por_vencer') {
+    conditions.push(`cm.estado = 'Activa' AND cm.fecha_vencimiento >= CURRENT_DATE AND cm.fecha_vencimiento <= CURRENT_DATE + INTERVAL '7 days'`);
+  } else if (vigencia === 'vencida') {
+    conditions.push(`cm.estado = 'Activa' AND cm.fecha_vencimiento < CURRENT_DATE`);
+  }
+
+  return runPagedFind({
+    pool,
+    selectSql: `SELECT cm.id, cm.cliente_id, cm.membresia_id, cm.fecha_inicio, cm.fecha_vencimiento,
+         cm.precio, cm.estado, cm.created_at, cm.updated_at,
+         c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.cedula AS cliente_cedula,
+         m.nombre AS membresia_nombre, m.duracion_dias AS membresia_duracion_dias,
+         (${VIGENCIA_SQL}) AS vigencia`,
+    fromSql: `FROM cliente_membresias cm
+  JOIN clientes c ON c.id = cm.cliente_id
+  JOIN membresias m ON m.id = cm.membresia_id`,
+    whereSql: conditions.join(' AND '),
+    params,
+    orderSql: 'cm.created_at DESC',
+    statsSql: `COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE cm.estado = 'Activa' AND cm.fecha_vencimiento >= CURRENT_DATE)::int AS vigentes,
+       COUNT(*) FILTER (WHERE cm.estado = 'Activa' AND cm.fecha_vencimiento >= CURRENT_DATE AND cm.fecha_vencimiento <= CURRENT_DATE + INTERVAL '7 days')::int AS por_vencer,
+       COUNT(*) FILTER (WHERE cm.estado = 'Activa' AND cm.fecha_vencimiento < CURRENT_DATE)::int AS vencidas`,
+    page,
+    limit,
+  });
 };
 
 const findById = async (id) => {

@@ -1,13 +1,45 @@
 const pool = require('../config/db');
+const { runPagedFind } = require('../utils/pagination');
 
-const findAll = async ({ archived = false } = {}) => {
-  const { rows } = await pool.query(
-    `SELECT * FROM entrenadores
-     WHERE archivado = $1
-     ORDER BY apellido ASC, nombre ASC`,
-    [archived]
-  );
-  return rows;
+const findAll = async ({
+  archived = false,
+  page = null,
+  limit = null,
+  search = '',
+  estado = '',
+} = {}) => {
+  const params = [archived];
+  const conditions = ['archivado = $1'];
+
+  if (search) {
+    params.push(`%${search}%`);
+    conditions.push(`(
+      CONCAT_WS(' ', nombre, apellido) ILIKE $${params.length}
+      OR cedula ILIKE $${params.length}
+      OR email ILIKE $${params.length}
+      OR telefono ILIKE $${params.length}
+      OR especialidad ILIKE $${params.length}
+    )`);
+  }
+
+  if (estado) {
+    params.push(estado);
+    conditions.push(`estado = $${params.length}`);
+  }
+
+  return runPagedFind({
+    pool,
+    selectSql: 'SELECT *',
+    fromSql: 'FROM entrenadores',
+    whereSql: conditions.join(' AND '),
+    params,
+    orderSql: 'apellido ASC, nombre ASC',
+    statsSql: `COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE estado = 'Activo')::int AS activos,
+       COUNT(*) FILTER (WHERE estado = 'Inactivo')::int AS inactivos`,
+    page,
+    limit,
+  });
 };
 
 const findById = async (id) => {

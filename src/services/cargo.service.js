@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { runPagedFind } = require('../utils/pagination');
 
 const SELECT_JOIN = `
   SELECT ca.id, ca.numero_cargo, ca.cliente_id, ca.cliente_membresia_id, ca.concepto,
@@ -9,9 +10,47 @@ const SELECT_JOIN = `
   JOIN clientes c ON c.id = ca.cliente_id
 `;
 
-const findAll = async () => {
-  const { rows } = await pool.query(`${SELECT_JOIN} ORDER BY ca.created_at DESC`);
-  return rows;
+const findAll = async ({
+  page = null,
+  limit = null,
+  search = '',
+  estado = '',
+} = {}) => {
+  const params = [];
+  const conditions = ['TRUE'];
+
+  if (search) {
+    params.push(`%${search}%`);
+    conditions.push(`(
+      ca.numero_cargo ILIKE $${params.length}
+      OR ca.concepto ILIKE $${params.length}
+      OR CONCAT_WS(' ', c.nombre, c.apellido) ILIKE $${params.length}
+      OR c.cedula ILIKE $${params.length}
+    )`);
+  }
+
+  if (estado) {
+    params.push(estado);
+    conditions.push(`ca.estado = $${params.length}`);
+  }
+
+  return runPagedFind({
+    pool,
+    selectSql: `SELECT ca.id, ca.numero_cargo, ca.cliente_id, ca.cliente_membresia_id, ca.concepto,
+         ca.monto, ca.fecha_generacion, ca.fecha_vencimiento, ca.estado,
+         ca.created_at, ca.updated_at,
+         c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.cedula AS cliente_cedula`,
+    fromSql: 'FROM cargos ca JOIN clientes c ON c.id = ca.cliente_id',
+    whereSql: conditions.join(' AND '),
+    params,
+    orderSql: 'ca.created_at DESC',
+    statsSql: `COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE ca.estado = 'Pendiente')::int AS pendientes,
+       COUNT(*) FILTER (WHERE ca.estado = 'Pagado')::int AS pagados,
+       COALESCE(SUM(ca.monto) FILTER (WHERE ca.estado = 'Pendiente'), 0)::float AS monto_pendiente`,
+    page,
+    limit,
+  });
 };
 
 const findById = async (id) => {

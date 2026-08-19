@@ -1,9 +1,18 @@
 const productoService = require('../services/producto.service');
+const { parseListQuery, sendList } = require('../utils/pagination');
 
 const getAll = async (req, res, next) => {
   try {
-    const data = await productoService.findAll();
-    res.json({ success: true, data });
+    const { paginated, page, limit, search } = parseListQuery(req.query);
+    const result = await productoService.findAll({
+      page,
+      limit,
+      search,
+      estado: ['Activo', 'Inactivo'].includes(req.query.estado) ? req.query.estado : '',
+      categoria_id: /^\d+$/.test(String(req.query.categoria_id || '')) ? req.query.categoria_id : '',
+      stock_bajo: req.query.stock_bajo === '1' || req.query.stock_bajo === 'true',
+    });
+    sendList(res, result, paginated);
   } catch (err) { next(err); }
 };
 

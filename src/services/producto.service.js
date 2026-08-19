@@ -1,13 +1,54 @@
 const pool = require('../config/db');
+const { runPagedFind } = require('../utils/pagination');
 
-const findAll = async () => {
-  const { rows } = await pool.query(
-    `SELECT p.*, c.nombre AS categoria_nombre
-     FROM productos p
-     LEFT JOIN categorias c ON c.id = p.categoria_id
-     ORDER BY p.id DESC`
-  );
-  return rows;
+const findAll = async ({
+  page = null,
+  limit = null,
+  search = '',
+  estado = '',
+  categoria_id = '',
+  stock_bajo = false,
+} = {}) => {
+  const params = [];
+  const conditions = ['TRUE'];
+
+  if (search) {
+    params.push(`%${search}%`);
+    conditions.push(`(
+      p.nombre ILIKE $${params.length}
+      OR p.codigo ILIKE $${params.length}
+      OR p.descripcion ILIKE $${params.length}
+      OR c.nombre ILIKE $${params.length}
+    )`);
+  }
+
+  if (estado) {
+    params.push(estado);
+    conditions.push(`p.estado = $${params.length}`);
+  }
+
+  if (categoria_id) {
+    params.push(Number(categoria_id));
+    conditions.push(`p.categoria_id = $${params.length}`);
+  }
+
+  if (stock_bajo) {
+    conditions.push('p.stock <= p.stock_minimo');
+  }
+
+  return runPagedFind({
+    pool,
+    selectSql: 'SELECT p.*, c.nombre AS categoria_nombre',
+    fromSql: 'FROM productos p LEFT JOIN categorias c ON c.id = p.categoria_id',
+    whereSql: conditions.join(' AND '),
+    params,
+    orderSql: 'p.id DESC',
+    statsSql: `COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE p.estado = 'Activo')::int AS activos,
+       COUNT(*) FILTER (WHERE p.stock <= p.stock_minimo)::int AS stock_bajo`,
+    page,
+    limit,
+  });
 };
 
 const findById = async (id) => {

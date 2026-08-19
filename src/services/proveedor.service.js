@@ -1,11 +1,44 @@
 const pool = require('../config/db');
+const { runPagedFind } = require('../utils/pagination');
 
-const findAll = async () => {
-  const { rows } = await pool.query(
-    `SELECT * FROM proveedores
-     ORDER BY nombre ASC`
-  );
-  return rows;
+const findAll = async ({
+  page = null,
+  limit = null,
+  search = '',
+  estado = '',
+} = {}) => {
+  const params = [];
+  const conditions = ['TRUE'];
+
+  if (search) {
+    params.push(`%${search}%`);
+    conditions.push(`(
+      nombre ILIKE $${params.length}
+      OR COALESCE(rnc, '') ILIKE $${params.length}
+      OR contacto ILIKE $${params.length}
+      OR telefono ILIKE $${params.length}
+      OR correo ILIKE $${params.length}
+    )`);
+  }
+
+  if (estado) {
+    params.push(estado);
+    conditions.push(`estado = $${params.length}`);
+  }
+
+  return runPagedFind({
+    pool,
+    selectSql: 'SELECT *',
+    fromSql: 'FROM proveedores',
+    whereSql: conditions.join(' AND '),
+    params,
+    orderSql: 'nombre ASC',
+    statsSql: `COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE estado = 'Activo')::int AS activos,
+       COUNT(*) FILTER (WHERE estado = 'Inactivo')::int AS inactivos`,
+    page,
+    limit,
+  });
 };
 
 const findById = async (id) => {

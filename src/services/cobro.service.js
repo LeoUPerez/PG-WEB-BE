@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { runPagedFind } = require('../utils/pagination');
 
 const SELECT_JOIN = `
   SELECT co.id, co.numero_cobro, co.cliente_id, co.metodo_pago_id, co.fecha_cobro,
@@ -10,9 +11,48 @@ const SELECT_JOIN = `
   JOIN metodos_pago mp ON mp.id = co.metodo_pago_id
 `;
 
-const findAll = async () => {
-  const { rows } = await pool.query(`${SELECT_JOIN} ORDER BY co.created_at DESC`);
-  return rows;
+const findAll = async ({
+  page = null,
+  limit = null,
+  search = '',
+  estado = '',
+} = {}) => {
+  const params = [];
+  const conditions = ['TRUE'];
+
+  if (search) {
+    params.push(`%${search}%`);
+    conditions.push(`(
+      co.numero_cobro ILIKE $${params.length}
+      OR CONCAT_WS(' ', c.nombre, c.apellido) ILIKE $${params.length}
+      OR c.cedula ILIKE $${params.length}
+      OR mp.nombre ILIKE $${params.length}
+    )`);
+  }
+
+  if (estado) {
+    params.push(estado);
+    conditions.push(`co.estado = $${params.length}`);
+  }
+
+  return runPagedFind({
+    pool,
+    selectSql: `SELECT co.id, co.numero_cobro, co.cliente_id, co.metodo_pago_id, co.fecha_cobro,
+         co.monto_total, co.estado, co.created_at, co.updated_at,
+         c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.cedula AS cliente_cedula,
+         mp.nombre AS metodo_pago_nombre`,
+    fromSql: `FROM cobros co
+  JOIN clientes c ON c.id = co.cliente_id
+  JOIN metodos_pago mp ON mp.id = co.metodo_pago_id`,
+    whereSql: conditions.join(' AND '),
+    params,
+    orderSql: 'co.created_at DESC',
+    statsSql: `COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE co.estado = 'Completado')::int AS completados,
+       COALESCE(SUM(co.monto_total) FILTER (WHERE co.estado = 'Completado'), 0)::float AS monto_total`,
+    page,
+    limit,
+  });
 };
 
 const findById = async (id) => {

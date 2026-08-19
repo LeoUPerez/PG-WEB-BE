@@ -1,10 +1,18 @@
 const membresiaService = require('../services/membresia.service');
+const { parseListQuery, sendList } = require('../utils/pagination');
 
 const getAll = async (req, res, next) => {
   try {
     const archived = req.query.archived === 'true';
-    const data = await membresiaService.findAll({ archived });
-    res.json({ success: true, data });
+    const { paginated, page, limit, search } = parseListQuery(req.query);
+    const result = await membresiaService.findAll({
+      archived,
+      page,
+      limit,
+      search,
+      estado: ['Activo', 'Inactivo'].includes(req.query.estado) ? req.query.estado : '',
+    });
+    sendList(res, result, paginated);
   } catch (err) { next(err); }
 };
 

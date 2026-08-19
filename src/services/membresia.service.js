@@ -1,19 +1,44 @@
 const pool = require('../config/db');
+const { runPagedFind } = require('../utils/pagination');
 
 const SELECT_COLS = `
   id, nombre, descripcion, duracion_dias, precio,
   estado, destacado, archivado, created_at, updated_at
 `;
 
-const findAll = async ({ archived = false } = {}) => {
-  const { rows } = await pool.query(
-    `SELECT ${SELECT_COLS}
-     FROM membresias
-     WHERE archivado = $1
-     ORDER BY nombre ASC`,
-    [archived]
-  );
-  return rows;
+const findAll = async ({
+  archived = false,
+  page = null,
+  limit = null,
+  search = '',
+  estado = '',
+} = {}) => {
+  const params = [archived];
+  const conditions = ['archivado = $1'];
+
+  if (search) {
+    params.push(`%${search}%`);
+    conditions.push(`(nombre ILIKE $${params.length} OR descripcion ILIKE $${params.length})`);
+  }
+
+  if (estado) {
+    params.push(estado);
+    conditions.push(`estado = $${params.length}`);
+  }
+
+  return runPagedFind({
+    pool,
+    selectSql: `SELECT ${SELECT_COLS}`,
+    fromSql: 'FROM membresias',
+    whereSql: conditions.join(' AND '),
+    params,
+    orderSql: 'nombre ASC',
+    statsSql: `COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE estado = 'Activo')::int AS activos,
+       COUNT(*) FILTER (WHERE estado = 'Inactivo')::int AS inactivos`,
+    page,
+    limit,
+  });
 };
 
 const findById = async (id) => {

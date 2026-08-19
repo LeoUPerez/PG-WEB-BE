@@ -1,9 +1,16 @@
 const cobroService = require('../services/cobro.service');
+const { parseListQuery, sendList } = require('../utils/pagination');
 
 const getAll = async (req, res, next) => {
   try {
-    const data = await cobroService.findAll();
-    res.json({ success: true, data });
+    const { paginated, page, limit, search } = parseListQuery(req.query);
+    const result = await cobroService.findAll({
+      page,
+      limit,
+      search,
+      estado: ['Completado', 'Anulado'].includes(req.query.estado) ? req.query.estado : '',
+    });
+    sendList(res, result, paginated);
   } catch (err) { next(err); }
 };
 
