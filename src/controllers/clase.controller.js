@@ -36,7 +36,10 @@ const update = async (req, res, next) => {
     const data = await claseService.update(req.params.id, req.body);
     if (!data) { res.status(404); throw new Error('Clase no encontrada'); }
     res.json({ success: true, data });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err.statusCode) res.status(err.statusCode);
+    next(err);
+  }
 };
 
 const toggleStatus = async (req, res, next) => {
@@ -45,7 +48,10 @@ const toggleStatus = async (req, res, next) => {
     const data = await claseService.toggleStatus(req.params.id, estado);
     if (!data) { res.status(404); throw new Error('Clase no encontrada'); }
     res.json({ success: true, data });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err.statusCode) res.status(err.statusCode);
+    next(err);
+  }
 };
 
 const archive = async (req, res, next) => {

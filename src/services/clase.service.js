@@ -1,6 +1,12 @@
 const pool = require('../config/db');
 const { runPagedFind } = require('../utils/pagination');
 
+const httpError = (message, statusCode = 400) => {
+  const err = new Error(message);
+  err.statusCode = statusCode;
+  return err;
+};
+
 const findAll = async ({
   archived = false,
   page = null,
@@ -55,6 +61,29 @@ const create = async ({ nombre, descripcion, capacidad, duracion_minutos, estado
 };
 
 const update = async (id, { nombre, descripcion, capacidad, duracion_minutos, estado }) => {
+  if (estado === 'Activo' && !(await tieneSalonAsignado(id))) {
+    throw httpError('No puedes activar la clase sin un salón asignado en el horario.');
+  }
+
+  const { rows: salonesChicos } = await pool.query(
+    `SELECT DISTINCT s.nombre, s.capacidad
+     FROM horarios_clases h
+     INNER JOIN salones s ON s.id = h.salon_id
+     WHERE h.clase_id = $1
+       AND h.archivado = false
+       AND s.capacidad < $2
+     ORDER BY s.nombre ASC`,
+    [id, capacidad]
+  );
+  if (salonesChicos.length) {
+    const detalle = salonesChicos
+      .map((s) => `${s.nombre} (${s.capacidad} plazas)`)
+      .join(', ');
+    throw httpError(
+      `Los cupos de la clase superan la capacidad de los salones asignados: ${detalle}.`
+    );
+  }
+
   const { rows } = await pool.query(
     `UPDATE clases
      SET nombre = $1, descripcion = $2, capacidad = $3,
@@ -66,7 +95,25 @@ const update = async (id, { nombre, descripcion, capacidad, duracion_minutos, es
   return rows[0] || null;
 };
 
+const tieneSalonAsignado = async (claseId) => {
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int AS total
+     FROM horarios_clases h
+     INNER JOIN salones s ON s.id = h.salon_id
+     WHERE h.clase_id = $1
+       AND h.archivado = false
+       AND h.estado = 'Activo'
+       AND s.archivado = false
+       AND s.estado = 'Activo'`,
+    [claseId]
+  );
+  return (rows[0]?.total ?? 0) > 0;
+};
+
 const toggleStatus = async (id, estado) => {
+  if (estado === 'Activo' && !(await tieneSalonAsignado(id))) {
+    throw httpError('No puedes activar la clase sin un salón asignado en el horario.');
+  }
   const { rows } = await pool.query(
     `UPDATE clases SET estado = $1, updated_at = NOW()
      WHERE id = $2 RETURNING *`,

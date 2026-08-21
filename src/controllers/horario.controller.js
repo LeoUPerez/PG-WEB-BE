@@ -20,19 +20,25 @@ const create = async (req, res, next) => {
   try {
     const data = await horarioService.create(req.body);
     res.status(201).json({ success: true, data });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err.statusCode) res.status(err.statusCode);
+    next(err);
+  }
 };
 
 const createBulk = async (req, res, next) => {
   try {
-    const { clase_id, entrenador_id, estado, dias } = req.body;
-    if (!clase_id || !entrenador_id || !Array.isArray(dias) || dias.length === 0) {
+    const { clase_id, entrenador_id, salon_id, estado, dias } = req.body;
+    if (!clase_id || !entrenador_id || !salon_id || !Array.isArray(dias) || dias.length === 0) {
       res.status(400);
-      throw new Error('Clase, entrenador y al menos un día son requeridos');
+      throw new Error('Clase, entrenador, salón y al menos un día son requeridos');
     }
-    const data = await horarioService.createBulk({ clase_id, entrenador_id, estado, dias });
+    const data = await horarioService.createBulk({ clase_id, entrenador_id, salon_id, estado, dias });
     res.status(201).json({ success: true, data });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err.statusCode) res.status(err.statusCode);
+    next(err);
+  }
 };
 
 const update = async (req, res, next) => {
@@ -40,7 +46,10 @@ const update = async (req, res, next) => {
     const data = await horarioService.update(req.params.id, req.body);
     if (!data) { res.status(404); throw new Error('Horario no encontrado'); }
     res.json({ success: true, data });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err.statusCode) res.status(err.statusCode);
+    next(err);
+  }
 };
 
 const toggleStatus = async (req, res, next) => {
