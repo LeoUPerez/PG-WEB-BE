@@ -38,8 +38,8 @@ const findAll = async ({
 
   return runPagedFind({
     pool,
-    selectSql: 'SELECT p.*, c.nombre AS categoria_nombre',
-    fromSql: 'FROM productos p LEFT JOIN categorias c ON c.id = p.categoria_id',
+    selectSql: 'SELECT p.*, c.nombre AS categoria_nombre, pr.nombre AS proveedor_nombre',
+    fromSql: 'FROM productos p LEFT JOIN categorias c ON c.id = p.categoria_id LEFT JOIN proveedores pr ON pr.id = p.proveedor_id',
     whereSql: conditions.join(' AND '),
     params,
     orderSql: 'p.id DESC',
@@ -53,9 +53,10 @@ const findAll = async ({
 
 const findById = async (id) => {
   const { rows } = await pool.query(
-    `SELECT p.*, c.nombre AS categoria_nombre
+    `SELECT p.*, c.nombre AS categoria_nombre, pr.nombre AS proveedor_nombre
      FROM productos p
      LEFT JOIN categorias c ON c.id = p.categoria_id
+     LEFT JOIN proveedores pr ON pr.id = p.proveedor_id
      WHERE p.id = $1`,
     [id]
   );
@@ -67,6 +68,7 @@ const create = async ({
   nombre,
   descripcion,
   categoria_id,
+  proveedor_id,
   precio_compra = 0,
   precio_venta = 0,
   stock = 0,
@@ -76,15 +78,16 @@ const create = async ({
 }) => {
   const { rows } = await pool.query(
     `INSERT INTO productos
-       (codigo, nombre, descripcion, categoria_id, precio_compra, precio_venta,
+       (codigo, nombre, descripcion, categoria_id, proveedor_id, precio_compra, precio_venta,
         stock, stock_minimo, imagen, estado)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING *`,
     [
       codigo,
       nombre,
       descripcion || null,
       categoria_id || null,
+      proveedor_id || null,
       precio_compra,
       precio_venta,
       stock,
@@ -101,6 +104,7 @@ const update = async (id, {
   nombre,
   descripcion,
   categoria_id,
+  proveedor_id,
   precio_compra,
   precio_venta,
   stock,
@@ -111,15 +115,16 @@ const update = async (id, {
   const { rows } = await pool.query(
     `UPDATE productos
      SET codigo = $1, nombre = $2, descripcion = $3, categoria_id = $4,
-         precio_compra = $5, precio_venta = $6, stock = $7, stock_minimo = $8,
-         imagen = $9, estado = $10, updated_at = NOW()
-     WHERE id = $11
+         proveedor_id = $5, precio_compra = $6, precio_venta = $7, stock = $8, stock_minimo = $9,
+         imagen = $10, estado = $11, updated_at = NOW()
+     WHERE id = $12
      RETURNING *`,
     [
       codigo,
       nombre,
       descripcion || null,
       categoria_id || null,
+      proveedor_id || null,
       precio_compra,
       precio_venta,
       stock,
