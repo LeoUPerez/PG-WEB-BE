@@ -40,7 +40,7 @@ const createReserva = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: 'Reserva registrada correctamente.',
+      message: 'Reserva registrada. Revisa tu correo para confirmar o cancelar tu asistencia.',
       data,
     });
   } catch (err) {
@@ -49,4 +49,42 @@ const createReserva = async (req, res, next) => {
   }
 };
 
-module.exports = { getClasesDisponibles, createReserva };
+const getReservaPorToken = async (req, res, next) => {
+  try {
+    const data = await publicService.findReservaByToken(req.params.token);
+    if (!data) { res.status(404); throw new Error('Reserva no encontrada.'); }
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const confirmarReservaPorToken = async (req, res, next) => {
+  try {
+    const data = await publicService.confirmarPorToken(req.params.token);
+    if (!data) { res.status(404); throw new Error('Reserva no encontrada.'); }
+    res.json({ success: true, message: 'Reserva confirmada.', data });
+  } catch (err) {
+    if (err.statusCode) res.status(err.statusCode);
+    next(err);
+  }
+};
+
+const cancelarReservaPorToken = async (req, res, next) => {
+  try {
+    const data = await publicService.cancelarPorToken(req.params.token);
+    if (!data) { res.status(404); throw new Error('Reserva no encontrada.'); }
+    res.json({ success: true, message: 'Reserva cancelada.', data });
+  } catch (err) {
+    if (err.statusCode) res.status(err.statusCode);
+    next(err);
+  }
+};
+
+module.exports = {
+  getClasesDisponibles,
+  createReserva,
+  getReservaPorToken,
+  confirmarReservaPorToken,
+  cancelarReservaPorToken,
+};

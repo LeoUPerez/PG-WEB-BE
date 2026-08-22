@@ -22,6 +22,7 @@ const clienteMembresiaRoutes = require('./routes/clienteMembresia.routes');
 const cargoRoutes = require('./routes/cargo.routes');
 const cobroRoutes = require('./routes/cobro.routes');
 const publicRoutes = require('./routes/public.routes');
+const reservaRoutes = require('./routes/reserva.routes');
 
 const app = express();
 
@@ -52,6 +53,7 @@ app.use('/api/cliente-membresias', clienteMembresiaRoutes);
 app.use('/api/cargos', cargoRoutes);
 app.use('/api/cobros', cobroRoutes);
 app.use('/api/public', publicRoutes);
+app.use('/api/reservas', reservaRoutes);
 
 // --- Error handling (must be last) ---
 app.use(notFound);
