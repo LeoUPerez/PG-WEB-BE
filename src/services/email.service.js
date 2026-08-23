@@ -1,6 +1,7 @@
 const sgMail = require('@sendgrid/mail');
 const { passwordResetEmailHtml, passwordResetEmailText } = require('../templates/passwordResetEmail');
 const { reservaConfirmEmailHtml, reservaConfirmEmailText } = require('../templates/reservaConfirmEmail');
+const { cobroPagoEmailHtml, cobroPagoEmailText } = require('../templates/cobroPagoEmail');
 
 if (process.env.SENDGRID_API_KEY) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -52,4 +53,23 @@ const enviarConfirmacionReserva = async ({
   });
 };
 
-module.exports = { enviarCodigoRecuperacion, enviarConfirmacionReserva };
+const enviarCotizacionCobro = async ({ destinatario, nombre, numeroCobro, lineas, montoTotal, link }) => {
+  if (!process.env.SENDGRID_API_KEY) {
+    throw new Error('SENDGRID_API_KEY no está configurada');
+  }
+  if (!process.env.SENDGRID_FROM_EMAIL) {
+    throw new Error('SENDGRID_FROM_EMAIL no está configurada');
+  }
+
+  const datos = { nombre, numeroCobro, lineas, montoTotal, link };
+
+  await sgMail.send({
+    to: destinatario,
+    from: process.env.SENDGRID_FROM_EMAIL,
+    subject: 'Tienes un pago pendiente — U-ROD',
+    text: cobroPagoEmailText(datos),
+    html: cobroPagoEmailHtml(datos),
+  });
+};
+
+module.exports = { enviarCodigoRecuperacion, enviarConfirmacionReserva, enviarCotizacionCobro };
