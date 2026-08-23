@@ -8,6 +8,7 @@ router.get('/productos', publicController.getProductosPublicos);
 router.get('/ciudades-entrega', publicController.getCiudadesEntrega);
 router.post('/solicitudes-cobertura', publicController.createSolicitudCobertura);
 router.post('/ventas', publicController.createVentaPublica);
+router.post('/ventas/:token/pagar-simulado', publicController.pagarVentaSimulada);
 router.get('/ventas/tracking', publicController.getVentaTracking);
 router.post('/reservas', publicController.createReserva);
 router.get('/reservas/:token', publicController.getReservaPorToken);

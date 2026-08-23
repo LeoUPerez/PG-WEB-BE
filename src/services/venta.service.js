@@ -438,13 +438,7 @@ const create = async ({
   return findById(id);
 };
 
-const confirmarPago = async (id, { metodo_pago }) => {
-  if (!METODOS_PAGO_CONFIRMACION.includes(metodo_pago)) {
-    const err = new Error('Método de pago inválido');
-    err.status = 400;
-    throw err;
-  }
-
+const marcarPagada = async (id, metodo_pago) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -495,6 +489,32 @@ const confirmarPago = async (id, { metodo_pago }) => {
   return findById(id);
 };
 
+const confirmarPago = async (id, { metodo_pago }) => {
+  if (!METODOS_PAGO_CONFIRMACION.includes(metodo_pago)) {
+    const err = new Error('Método de pago inválido');
+    err.status = 400;
+    throw err;
+  }
+
+  const { rows: peek } = await pool.query('SELECT estado, metodo_pago FROM ventas WHERE id = $1', [id]);
+  if (!peek[0]) return null;
+  if (peek[0].metodo_pago === 'SimuladoTarjeta' || peek[0].estado === 'Pagada') {
+    const err = new Error('Esta venta ya fue pagada por tarjeta simulada en la app. No requiere confirmación en recepción.');
+    err.status = 400;
+    throw err;
+  }
+  if (peek[0].estado !== 'Pendiente' || peek[0].metodo_pago !== 'PendienteRecepcion') {
+    const err = new Error('Solo se puede confirmar el pago de ventas pendientes de recepción');
+    err.status = 400;
+    throw err;
+  }
+
+  return marcarPagada(id, metodo_pago);
+};
+
+/** Marca Pagada con método SimuladoTarjeta (checkout público). */
+const pagarSimulado = async (id) => marcarPagada(id, 'SimuladoTarjeta');
+
 const anular = async (id) => {
   const client = await pool.connect();
   try {
@@ -506,14 +526,14 @@ const anular = async (id) => {
       await client.query('ROLLBACK');
       return null;
     }
-    if (!['Pendiente', 'Pagada', 'Entregada'].includes(venta.estado)) {
-      const err = new Error('Esta venta ya fue anulada');
+    if (!['Pendiente'].includes(venta.estado)) {
+      const err = new Error(
+        venta.estado === 'Anulada'
+          ? 'Esta venta ya fue anulada'
+          : 'Una venta pagada o entregada no se puede anular'
+      );
       err.status = 400;
       throw err;
-    }
-
-    if (venta.estado === 'Pagada' || venta.estado === 'Entregada') {
-      await restaurarStock(client, id);
     }
 
     await client.query(
@@ -660,6 +680,7 @@ module.exports = {
   findProductosActivos,
   create,
   confirmarPago,
+  pagarSimulado,
   anular,
   actualizarTracking,
   avanceCamion,

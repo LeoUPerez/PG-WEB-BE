@@ -392,6 +392,48 @@ const createSolicitudCobertura = async ({
   return rows[0];
 };
 
+/** Simulación de tarjeta: solo números de prueba. Nunca persistir PAN/CVV. */
+const evaluarTarjetaSimulada = (numeroTarjeta) => {
+  const digits = String(numeroTarjeta || '').replace(/\D/g, '');
+  if (digits.length < 13 || digits.length > 19) {
+    return {
+      aprobada: false,
+      mensaje: 'Número de tarjeta inválido. Usa una tarjeta de prueba (ej. 4242 4242 4242 4242).',
+    };
+  }
+
+  let brand = 'Card';
+  if (/^4/.test(digits)) brand = 'Visa';
+  else if (/^(5[1-5]|2[2-7])/.test(digits)) brand = 'Mastercard';
+  else if (/^3[47]/.test(digits)) brand = 'Amex';
+
+  const last4 = digits.slice(-4);
+  // Rechazo fijo (estilo Stripe test)
+  if (digits === '4000000000000002') {
+    return {
+      aprobada: false,
+      brand,
+      last4,
+      mensaje: 'Pago rechazado por el banco (tarjeta de prueba de rechazo).',
+    };
+  }
+  // Éxito: Visa de prueba 4242… u otras que no estén en lista de rechazo
+  if (digits === '4242424242424242' || digits.startsWith('4242')) {
+    return { aprobada: true, brand, last4 };
+  }
+  // Otras marcas de prueba comunes
+  if (digits === '5555555555554444' || digits === '378282246310005') {
+    return { aprobada: true, brand, last4 };
+  }
+
+  return {
+    aprobada: false,
+    brand,
+    last4,
+    mensaje: 'Usa una tarjeta de prueba: 4242 4242 4242 4242 (éxito) o 4000 0000 0000 0002 (rechazo).',
+  };
+};
+
 const createVentaPublica = async (payload) => {
   const ventaService = require('./venta.service');
 
@@ -413,12 +455,20 @@ const createVentaPublica = async (payload) => {
     error.statusCode = 400;
     throw error;
   }
-
-  // Fase 3: solo cobro en recepción. Fase 4 añadirá tarjeta simulada.
-  if (canal_pago !== 'recepcion') {
-    const error = new Error('Por ahora solo está disponible pagar en recepción.');
+  if (!['recepcion', 'tarjeta'].includes(canal_pago)) {
+    const error = new Error('Canal de pago inválido.');
     error.statusCode = 400;
     throw error;
+  }
+
+  let pagoSim = null;
+  if (canal_pago === 'tarjeta') {
+    pagoSim = evaluarTarjetaSimulada(payload.tarjeta_numero);
+    if (!pagoSim.aprobada) {
+      const error = new Error(pagoSim.mensaje || 'Pago rechazado.');
+      error.statusCode = 402;
+      throw error;
+    }
   }
 
   let venta;
@@ -436,8 +486,8 @@ const createVentaPublica = async (payload) => {
       calle: payload.calle,
       numero_casa: payload.numero_casa,
       referencias: payload.referencias,
-      estado: 'Pendiente',
-      metodo_pago: 'PendienteRecepcion',
+      estado: canal_pago === 'tarjeta' ? 'Pagada' : 'Pendiente',
+      metodo_pago: canal_pago === 'tarjeta' ? 'SimuladoTarjeta' : 'PendienteRecepcion',
       detalle: payload.detalle,
     });
   } catch (err) {
@@ -445,11 +495,17 @@ const createVentaPublica = async (payload) => {
     throw err;
   }
 
-  const link = `${(process.env.FRONTEND_URL || '').replace(/\/$/, '')}/tracking_venta.php?q=${encodeURIComponent(venta.numero_venta)}`;
+  const linkBase = (process.env.FRONTEND_URL || 'http://localhost:8080').replace(/\/$/, '');
+  const link = `${linkBase}/tracking_venta.php?q=${encodeURIComponent(venta.numero_venta)}`;
   const tipoLabel = tipo_entrega === 'Domicilio'
     ? `Domicilio · ${venta.ciudad_nombre || ''}`.trim()
     : 'Retiro en gym';
+  const pagada = canal_pago === 'tarjeta';
+  const estadoEmail = pagada
+    ? 'Pagada (tarjeta simulada)'
+    : 'Pendiente de pago en recepción';
 
+  let emailEnviado = false;
   try {
     await emailService.enviarConfirmacionVenta({
       destinatario: venta.comprador_email,
@@ -457,16 +513,68 @@ const createVentaPublica = async (payload) => {
       numero_venta: venta.numero_venta,
       total: venta.total,
       tipo_entrega: tipoLabel,
-      estado: 'Pendiente de pago en recepción',
+      estado: estadoEmail,
       link,
+      pagada,
     });
+    emailEnviado = true;
   } catch (err) {
-    console.error('No se pudo enviar el correo de tracking de venta:', err.message);
+    const detail = err?.response?.body || err.message;
+    console.error('No se pudo enviar el correo de tracking de venta:', detail);
   }
 
   return {
     ...toPublicVenta(venta),
     tracking_url: link,
+    email_enviado: emailEnviado,
+    pago: pagoSim
+      ? { resultado: 'aprobado', brand: pagoSim.brand, last4: pagoSim.last4 }
+      : { resultado: 'pendiente_recepcion' },
+  };
+};
+
+const pagarVentaSimulada = async (token, payload = {}) => {
+  const ventaService = require('./venta.service');
+  const codigo = String(token || '').trim();
+  if (!codigo) {
+    const error = new Error('Token de venta requerido.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const pagoSim = evaluarTarjetaSimulada(payload.tarjeta_numero);
+  if (!pagoSim.aprobada) {
+    const error = new Error(pagoSim.mensaje || 'Pago rechazado.');
+    error.statusCode = 402;
+    throw error;
+  }
+
+  const { rows } = await pool.query(
+    `SELECT id, estado FROM ventas WHERE token = $1 LIMIT 1`,
+    [codigo]
+  );
+  if (!rows[0]) {
+    const error = new Error('Pedido no encontrado.');
+    error.statusCode = 404;
+    throw error;
+  }
+  if (rows[0].estado !== 'Pendiente') {
+    const error = new Error('Este pedido ya no está pendiente de pago.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  let venta;
+  try {
+    venta = await ventaService.pagarSimulado(rows[0].id);
+  } catch (err) {
+    if (err.status && !err.statusCode) err.statusCode = err.status;
+    throw err;
+  }
+
+  return {
+    ...toPublicVenta(venta),
+    pago: { resultado: 'aprobado', brand: pagoSim.brand, last4: pagoSim.last4 },
   };
 };
 
@@ -493,6 +601,7 @@ module.exports = {
   findCiudadesEntrega,
   createSolicitudCobertura,
   createVentaPublica,
+  pagarVentaSimulada,
   findVentaTracking,
   createReserva,
   findReservaByToken,

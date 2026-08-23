@@ -94,9 +94,26 @@ const cancelarReservaPorToken = async (req, res, next) => {
 const createVentaPublica = async (req, res, next) => {
   try {
     const data = await publicService.createVentaPublica(req.body || {});
+    const pagada = data.estado === 'Pagada';
     res.status(201).json({
       success: true,
-      message: 'Pedido registrado. Revisa tu correo con el número de tracking.',
+      message: pagada
+        ? 'Pago simulado aprobado. Revisa tu correo con el número de tracking.'
+        : 'Pedido registrado. Paga en recepción; te enviamos el tracking por correo.',
+      data,
+    });
+  } catch (err) {
+    if (err.statusCode || err.status) res.status(err.statusCode || err.status);
+    next(err);
+  }
+};
+
+const pagarVentaSimulada = async (req, res, next) => {
+  try {
+    const data = await publicService.pagarVentaSimulada(req.params.token, req.body || {});
+    res.json({
+      success: true,
+      message: 'Pago simulado aprobado.',
       data,
     });
   } catch (err) {
@@ -147,6 +164,7 @@ module.exports = {
   getCiudadesEntrega,
   createSolicitudCobertura,
   createVentaPublica,
+  pagarVentaSimulada,
   getVentaTracking,
   createReserva,
   getReservaPorToken,

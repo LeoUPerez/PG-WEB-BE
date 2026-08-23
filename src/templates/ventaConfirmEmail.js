@@ -5,6 +5,7 @@ const ventaConfirmEmailHtml = ({
   tipo_entrega,
   estado,
   link,
+  pagada = false,
 }) => `
 <!DOCTYPE html>
 <html lang="es">
@@ -26,9 +27,11 @@ const ventaConfirmEmailHtml = ({
           </tr>
           <tr>
             <td align="center" style="padding:0 32px;">
-              <h1 style="margin:0;font-size:20px;color:#FFFFFF;font-weight:700;">Pedido registrado</h1>
+              <h1 style="margin:0;font-size:20px;color:#FFFFFF;font-weight:700;">${pagada ? 'Pago confirmado' : 'Pedido registrado'}</h1>
               <p style="margin:10px 0 0;font-size:13.5px;line-height:1.6;color:#8B96A8;">
-                Hola${nombre ? ' ' + nombre : ''}, guardamos tu pedido. Usa el número de tracking para seguirlo.
+                Hola${nombre ? ' ' + nombre : ''}, ${pagada
+                  ? 'recibimos tu pago con tarjeta. Usa el número de tracking para seguir tu pedido.'
+                  : 'guardamos tu pedido. Usa el número de tracking para seguirlo.'}
               </p>
             </td>
           </tr>
@@ -79,9 +82,12 @@ const ventaConfirmEmailText = ({
   tipo_entrega,
   estado,
   link,
+  pagada = false,
 }) =>
   `Hola${nombre ? ' ' + nombre : ''},\n\n` +
-  `Tu pedido ${numero_venta} fue registrado.\n` +
+  (pagada
+    ? `Tu pedido ${numero_venta} fue pagado correctamente.\n`
+    : `Tu pedido ${numero_venta} fue registrado.\n`) +
   `Total: $${Number(total || 0).toFixed(2)}\n` +
   `Entrega: ${tipo_entrega}\n` +
   `Estado de pago: ${estado}\n\n` +

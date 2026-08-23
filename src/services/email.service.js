@@ -61,6 +61,7 @@ const enviarConfirmacionVenta = async ({
   tipo_entrega,
   estado,
   link,
+  pagada = false,
 }) => {
   if (!process.env.SENDGRID_API_KEY) {
     throw new Error('SENDGRID_API_KEY no está configurada');
@@ -69,12 +70,14 @@ const enviarConfirmacionVenta = async ({
     throw new Error('SENDGRID_FROM_EMAIL no está configurada');
   }
 
-  const datos = { nombre, numero_venta, total, tipo_entrega, estado, link };
+  const datos = { nombre, numero_venta, total, tipo_entrega, estado, link, pagada };
 
   await sgMail.send({
     to: destinatario,
     from: process.env.SENDGRID_FROM_EMAIL,
-    subject: `Tu pedido ${numero_venta} — U-ROD`,
+    subject: pagada
+      ? `Pago confirmado · ${numero_venta} — U-ROD`
+      : `Tu pedido ${numero_venta} — U-ROD`,
     text: ventaConfirmEmailText(datos),
     html: ventaConfirmEmailHtml(datos),
   });
