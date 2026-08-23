@@ -9,6 +9,16 @@ const getClasesDisponibles = async (req, res, next) => {
   }
 };
 
+const getProductosPublicos = async (req, res, next) => {
+  try {
+    const categoria_id = req.query.categoria_id || '';
+    const data = await publicService.findProductosPublicos({ categoria_id });
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const createReserva = async (req, res, next) => {
   try {
     const {
@@ -83,6 +93,7 @@ const cancelarReservaPorToken = async (req, res, next) => {
 
 module.exports = {
   getClasesDisponibles,
+  getProductosPublicos,
   createReserva,
   getReservaPorToken,
   confirmarReservaPorToken,

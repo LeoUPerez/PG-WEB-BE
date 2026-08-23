@@ -279,8 +279,42 @@ const cancelarPorToken = async (token) => {
   return findReservaByToken(token);
 };
 
+const findProductosPublicos = async ({ categoria_id = '' } = {}) => {
+  const params = [];
+  const conditions = [
+    "p.estado = 'Activo'",
+    "(c.id IS NULL OR (c.estado = 'Activo' AND c.archivado = false))",
+  ];
+
+  if (categoria_id) {
+    params.push(Number(categoria_id));
+    conditions.push(`p.categoria_id = $${params.length}`);
+  }
+
+  const { rows } = await pool.query(
+    `SELECT
+       p.id,
+       p.nombre,
+       p.descripcion,
+       p.precio_venta,
+       p.imagen,
+       p.stock,
+       (p.stock > 0) AS disponible,
+       c.id AS categoria_id,
+       c.nombre AS categoria
+     FROM productos p
+     LEFT JOIN categorias c ON c.id = p.categoria_id
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY p.nombre ASC`,
+    params
+  );
+
+  return rows;
+};
+
 module.exports = {
   findClasesDisponibles,
+  findProductosPublicos,
   createReserva,
   findReservaByToken,
   confirmarPorToken,

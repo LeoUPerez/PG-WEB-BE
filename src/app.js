@@ -24,6 +24,7 @@ const cobroRoutes = require('./routes/cobro.routes');
 const publicRoutes = require('./routes/public.routes');
 const reservaRoutes = require('./routes/reserva.routes');
 const compraRoutes = require('./routes/compra.routes');
+const ventaRoutes = require('./routes/venta.routes');
 
 const app = express();
 
@@ -56,6 +57,7 @@ app.use('/api/cobros', cobroRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/reservas', reservaRoutes);
 app.use('/api/compras', compraRoutes);
+app.use('/api/ventas', ventaRoutes);
 
 // --- Error handling (must be last) ---
 app.use(notFound);
