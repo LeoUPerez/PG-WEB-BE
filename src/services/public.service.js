@@ -312,9 +312,188 @@ const findProductosPublicos = async ({ categoria_id = '' } = {}) => {
   return rows;
 };
 
+const toPublicVenta = (venta) => {
+  if (!venta) return null;
+  return {
+    id: venta.id,
+    numero_venta: venta.numero_venta,
+    token: venta.token,
+    estado: venta.estado,
+    metodo_pago: venta.metodo_pago,
+    tipo_entrega: venta.tipo_entrega,
+    direccion_entrega: venta.direccion_entrega,
+    ciudad_id: venta.ciudad_id,
+    ciudad_nombre: venta.ciudad_nombre,
+    sector: venta.sector,
+    calle: venta.calle,
+    numero_casa: venta.numero_casa,
+    referencias: venta.referencias,
+    total: venta.total,
+    tracking_status: venta.tracking_status,
+    porcentaje_entrega: venta.porcentaje_entrega,
+    comprador_nombre: venta.comprador_nombre,
+    comprador_apellido: venta.comprador_apellido,
+    comprador_email: venta.comprador_email,
+    created_at: venta.created_at,
+    detalle: (venta.detalle || []).map((d) => ({
+      producto_id: d.producto_id,
+      producto_nombre: d.producto_nombre,
+      producto_codigo: d.producto_codigo,
+      cantidad: d.cantidad,
+      precio_unitario: d.precio_unitario,
+      subtotal: d.subtotal,
+    })),
+  };
+};
+
+const findCiudadesEntrega = async () => {
+  const { rows } = await pool.query(
+    `SELECT id, nombre
+     FROM ciudades_entrega
+     WHERE activa = true
+     ORDER BY orden ASC, nombre ASC`
+  );
+  return rows;
+};
+
+const createSolicitudCobertura = async ({
+  ciudad_solicitada,
+  email,
+  telefono = null,
+  nombre = null,
+  comentario = null,
+}) => {
+  const ciudad = String(ciudad_solicitada || '').trim();
+  const mail = String(email || '').trim().toLowerCase();
+  if (!ciudad || ciudad.length < 2) {
+    const error = new Error('Indica la ciudad que quieres solicitar.');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!mail || !mail.includes('@')) {
+    const error = new Error('Indica un email válido para avisarte.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const { rows } = await pool.query(
+    `INSERT INTO solicitudes_cobertura
+       (ciudad_solicitada, email, telefono, nombre, comentario)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, ciudad_solicitada, email, estado, created_at`,
+    [
+      ciudad,
+      mail,
+      telefono ? String(telefono).trim() : null,
+      nombre ? String(nombre).trim() : null,
+      comentario ? String(comentario).trim() : null,
+    ]
+  );
+  return rows[0];
+};
+
+const createVentaPublica = async (payload) => {
+  const ventaService = require('./venta.service');
+
+  const tipo_entrega = payload.tipo_entrega || 'RetiroGym';
+  const canal_pago = payload.canal_pago || 'recepcion';
+
+  if (!['RetiroGym', 'Domicilio'].includes(tipo_entrega)) {
+    const error = new Error('Tipo de entrega inválido.');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!payload.comprador_nombre || !payload.comprador_apellido || !payload.comprador_email) {
+    const error = new Error('Nombre, apellido y email son obligatorios.');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!Array.isArray(payload.detalle) || payload.detalle.length === 0) {
+    const error = new Error('Agrega al menos un producto al carrito.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Fase 3: solo cobro en recepción. Fase 4 añadirá tarjeta simulada.
+  if (canal_pago !== 'recepcion') {
+    const error = new Error('Por ahora solo está disponible pagar en recepción.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  let venta;
+  try {
+    venta = await ventaService.create({
+      origen: 'Publica',
+      comprador_nombre: payload.comprador_nombre,
+      comprador_apellido: payload.comprador_apellido,
+      comprador_email: payload.comprador_email,
+      comprador_telefono: payload.comprador_telefono || null,
+      comprador_cedula: null,
+      tipo_entrega,
+      ciudad_id: payload.ciudad_id,
+      sector: payload.sector,
+      calle: payload.calle,
+      numero_casa: payload.numero_casa,
+      referencias: payload.referencias,
+      estado: 'Pendiente',
+      metodo_pago: 'PendienteRecepcion',
+      detalle: payload.detalle,
+    });
+  } catch (err) {
+    if (err.status && !err.statusCode) err.statusCode = err.status;
+    throw err;
+  }
+
+  const link = `${(process.env.FRONTEND_URL || '').replace(/\/$/, '')}/tracking_venta.php?q=${encodeURIComponent(venta.numero_venta)}`;
+  const tipoLabel = tipo_entrega === 'Domicilio'
+    ? `Domicilio · ${venta.ciudad_nombre || ''}`.trim()
+    : 'Retiro en gym';
+
+  try {
+    await emailService.enviarConfirmacionVenta({
+      destinatario: venta.comprador_email,
+      nombre: venta.comprador_nombre,
+      numero_venta: venta.numero_venta,
+      total: venta.total,
+      tipo_entrega: tipoLabel,
+      estado: 'Pendiente de pago en recepción',
+      link,
+    });
+  } catch (err) {
+    console.error('No se pudo enviar el correo de tracking de venta:', err.message);
+  }
+
+  return {
+    ...toPublicVenta(venta),
+    tracking_url: link,
+  };
+};
+
+const findVentaTracking = async (q) => {
+  const ventaService = require('./venta.service');
+  const codigo = String(q || '').trim();
+  if (!codigo) return null;
+
+  const { rows } = await pool.query(
+    `SELECT id FROM ventas
+     WHERE numero_venta = $1 OR token = $1
+     LIMIT 1`,
+    [codigo]
+  );
+  if (!rows[0]) return null;
+
+  const venta = await ventaService.findById(rows[0].id);
+  return toPublicVenta(venta);
+};
+
 module.exports = {
   findClasesDisponibles,
   findProductosPublicos,
+  findCiudadesEntrega,
+  createSolicitudCobertura,
+  createVentaPublica,
+  findVentaTracking,
   createReserva,
   findReservaByToken,
   confirmarPorToken,

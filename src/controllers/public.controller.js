@@ -91,9 +91,63 @@ const cancelarReservaPorToken = async (req, res, next) => {
   }
 };
 
+const createVentaPublica = async (req, res, next) => {
+  try {
+    const data = await publicService.createVentaPublica(req.body || {});
+    res.status(201).json({
+      success: true,
+      message: 'Pedido registrado. Revisa tu correo con el número de tracking.',
+      data,
+    });
+  } catch (err) {
+    if (err.statusCode || err.status) res.status(err.statusCode || err.status);
+    next(err);
+  }
+};
+
+const getVentaTracking = async (req, res, next) => {
+  try {
+    const data = await publicService.findVentaTracking(req.query.q);
+    if (!data) {
+      res.status(404);
+      throw new Error('No encontramos un pedido con ese número de tracking.');
+    }
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const getCiudadesEntrega = async (req, res, next) => {
+  try {
+    const data = await publicService.findCiudadesEntrega();
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const createSolicitudCobertura = async (req, res, next) => {
+  try {
+    const data = await publicService.createSolicitudCobertura(req.body || {});
+    res.status(201).json({
+      success: true,
+      message: 'Solicitud registrada. Te avisaremos cuando haya cobertura en esa ciudad.',
+      data,
+    });
+  } catch (err) {
+    if (err.statusCode || err.status) res.status(err.statusCode || err.status);
+    next(err);
+  }
+};
+
 module.exports = {
   getClasesDisponibles,
   getProductosPublicos,
+  getCiudadesEntrega,
+  createSolicitudCobertura,
+  createVentaPublica,
+  getVentaTracking,
   createReserva,
   getReservaPorToken,
   confirmarReservaPorToken,

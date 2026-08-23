@@ -1,6 +1,7 @@
 const sgMail = require('@sendgrid/mail');
 const { passwordResetEmailHtml, passwordResetEmailText } = require('../templates/passwordResetEmail');
 const { reservaConfirmEmailHtml, reservaConfirmEmailText } = require('../templates/reservaConfirmEmail');
+const { ventaConfirmEmailHtml, ventaConfirmEmailText } = require('../templates/ventaConfirmEmail');
 
 if (process.env.SENDGRID_API_KEY) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -52,4 +53,35 @@ const enviarConfirmacionReserva = async ({
   });
 };
 
-module.exports = { enviarCodigoRecuperacion, enviarConfirmacionReserva };
+const enviarConfirmacionVenta = async ({
+  destinatario,
+  nombre,
+  numero_venta,
+  total,
+  tipo_entrega,
+  estado,
+  link,
+}) => {
+  if (!process.env.SENDGRID_API_KEY) {
+    throw new Error('SENDGRID_API_KEY no está configurada');
+  }
+  if (!process.env.SENDGRID_FROM_EMAIL) {
+    throw new Error('SENDGRID_FROM_EMAIL no está configurada');
+  }
+
+  const datos = { nombre, numero_venta, total, tipo_entrega, estado, link };
+
+  await sgMail.send({
+    to: destinatario,
+    from: process.env.SENDGRID_FROM_EMAIL,
+    subject: `Tu pedido ${numero_venta} — U-ROD`,
+    text: ventaConfirmEmailText(datos),
+    html: ventaConfirmEmailHtml(datos),
+  });
+};
+
+module.exports = {
+  enviarCodigoRecuperacion,
+  enviarConfirmacionReserva,
+  enviarConfirmacionVenta,
+};

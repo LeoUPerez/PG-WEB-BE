@@ -5,11 +5,90 @@ const { runPagedFind } = require('../utils/pagination');
 const METODOS_PAGO_CONFIRMACION = ['Efectivo', 'Tarjeta', 'Transferencia'];
 const ESTADOS_FILTRO = ['Pendiente', 'Pagada', 'Anulada', 'Entregada'];
 
+const componerDireccion = ({
+  ciudad_nombre = null,
+  sector = null,
+  calle = null,
+  numero_casa = null,
+  referencias = null,
+} = {}) => {
+  const partes = [];
+  if (ciudad_nombre) partes.push(String(ciudad_nombre).trim());
+  if (sector) partes.push(`Sector ${String(sector).trim()}`);
+  if (calle) partes.push(`Calle ${String(calle).trim()}`);
+  if (numero_casa) partes.push(`Casa/apto ${String(numero_casa).trim()}`);
+  if (referencias) partes.push(`Ref: ${String(referencias).trim()}`);
+  return partes.length ? partes.join(' · ') : null;
+};
+
+const normalizarDireccionDomicilio = async ({
+  ciudad_id = null,
+  ciudad_nombre = null,
+  sector = null,
+  calle = null,
+  numero_casa = null,
+  referencias = null,
+  direccion_entrega = null,
+} = {}) => {
+  let ciudadId = ciudad_id ? Number(ciudad_id) : null;
+  let ciudadNombre = ciudad_nombre ? String(ciudad_nombre).trim() : null;
+
+  if (ciudadId) {
+    const { rows } = await pool.query(
+      `SELECT id, nombre FROM ciudades_entrega WHERE id = $1 AND activa = true`,
+      [ciudadId]
+    );
+    if (!rows[0]) {
+      const err = new Error('La ciudad seleccionada no está disponible para entrega');
+      err.status = 400;
+      throw err;
+    }
+    ciudadId = rows[0].id;
+    ciudadNombre = rows[0].nombre;
+  }
+
+  const calleN = calle ? String(calle).trim() : '';
+  const casaN = numero_casa ? String(numero_casa).trim() : '';
+  const sectorN = sector ? String(sector).trim() : '';
+  const refN = referencias ? String(referencias).trim() : '';
+
+  if (!ciudadId || !ciudadNombre) {
+    const err = new Error('Selecciona una ciudad con cobertura de entrega');
+    err.status = 400;
+    throw err;
+  }
+  if (!calleN || !casaN) {
+    const err = new Error('Calle y número de casa/apto son obligatorios para domicilio');
+    err.status = 400;
+    throw err;
+  }
+
+  const compuesta = componerDireccion({
+    ciudad_nombre: ciudadNombre,
+    sector: sectorN || null,
+    calle: calleN,
+    numero_casa: casaN,
+    referencias: refN || null,
+  }) || (direccion_entrega ? String(direccion_entrega).trim() : null);
+
+  return {
+    ciudad_id: ciudadId,
+    ciudad_nombre: ciudadNombre,
+    sector: sectorN || null,
+    calle: calleN,
+    numero_casa: casaN,
+    referencias: refN || null,
+    direccion_entrega: compuesta,
+  };
+};
+
 const SELECT_JOIN = `
   SELECT v.id, v.numero_venta, v.origen, v.cliente_id,
          v.comprador_nombre, v.comprador_apellido, v.comprador_email,
          v.comprador_telefono, v.comprador_cedula,
-         v.tipo_entrega, v.direccion_entrega, v.estado, v.metodo_pago,
+         v.tipo_entrega, v.direccion_entrega,
+         v.ciudad_id, v.ciudad_nombre, v.sector, v.calle, v.numero_casa, v.referencias,
+         v.estado, v.metodo_pago,
          v.total, v.token, v.tracking_status, v.porcentaje_entrega,
          v.created_at, v.updated_at,
          TRIM(CONCAT(COALESCE(c.nombre, ''), ' ', COALESCE(c.apellido, ''))) AS cliente_nombre
@@ -57,7 +136,9 @@ const findAll = async ({
     selectSql: `SELECT v.id, v.numero_venta, v.origen, v.cliente_id,
          v.comprador_nombre, v.comprador_apellido, v.comprador_email,
          v.comprador_telefono, v.comprador_cedula,
-         v.tipo_entrega, v.direccion_entrega, v.estado, v.metodo_pago,
+         v.tipo_entrega, v.direccion_entrega,
+         v.ciudad_id, v.ciudad_nombre, v.sector, v.calle, v.numero_casa, v.referencias,
+         v.estado, v.metodo_pago,
          v.total, v.token, v.tracking_status, v.porcentaje_entrega,
          v.created_at, v.updated_at,
          TRIM(CONCAT(COALESCE(c.nombre, ''), ' ', COALESCE(c.apellido, ''))) AS cliente_nombre`,
@@ -214,6 +295,12 @@ const create = async ({
   comprador_cedula = null,
   tipo_entrega = 'RetiroGym',
   direccion_entrega = null,
+  ciudad_id = null,
+  ciudad_nombre = null,
+  sector = null,
+  calle = null,
+  numero_casa = null,
+  referencias = null,
   estado = 'Pendiente',
   metodo_pago = null,
   detalle,
@@ -238,10 +325,26 @@ const create = async ({
     err.status = 400;
     throw err;
   }
-  if (tipo_entrega === 'Domicilio' && !String(direccion_entrega || '').trim()) {
-    const err = new Error('La dirección de entrega es obligatoria para domicilio');
-    err.status = 400;
-    throw err;
+
+  let dir = {
+    ciudad_id: null,
+    ciudad_nombre: null,
+    sector: null,
+    calle: null,
+    numero_casa: null,
+    referencias: null,
+    direccion_entrega: null,
+  };
+  if (tipo_entrega === 'Domicilio') {
+    dir = await normalizarDireccionDomicilio({
+      ciudad_id,
+      ciudad_nombre,
+      sector,
+      calle,
+      numero_casa,
+      referencias,
+      direccion_entrega,
+    });
   }
 
   let metodo = metodo_pago;
@@ -278,10 +381,12 @@ const create = async ({
          id, numero_venta, origen, cliente_id,
          comprador_nombre, comprador_apellido, comprador_email,
          comprador_telefono, comprador_cedula,
-         tipo_entrega, direccion_entrega, estado, metodo_pago,
+         tipo_entrega, direccion_entrega,
+         ciudad_id, ciudad_nombre, sector, calle, numero_casa, referencias,
+         estado, metodo_pago,
          total, token, tracking_status, porcentaje_entrega
        ) VALUES (
-         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
+         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23
        )`,
       [
         id,
@@ -294,7 +399,13 @@ const create = async ({
         comprador_telefono || null,
         comprador_cedula || null,
         tipo_entrega,
-        tipo_entrega === 'Domicilio' ? String(direccion_entrega).trim() : null,
+        dir.direccion_entrega,
+        dir.ciudad_id,
+        dir.ciudad_nombre,
+        dir.sector,
+        dir.calle,
+        dir.numero_casa,
+        dir.referencias,
         estado,
         metodo,
         total,
@@ -553,4 +664,6 @@ module.exports = {
   actualizarTracking,
   avanceCamion,
   trackingFromPorcentaje,
+  componerDireccion,
+  normalizarDireccionDomicilio,
 };
