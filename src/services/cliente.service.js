@@ -7,6 +7,8 @@ const findAll = async ({
   search = '',
   estado = '',
   sexo = '',
+  fecha_desde = '',
+  fecha_hasta = '',
 } = {}) => {
   const params = [archived];
   const conditions = ['archivado = $1'];
@@ -30,6 +32,16 @@ const findAll = async ({
   if (sexo) {
     params.push(sexo);
     conditions.push(`sexo = $${params.length}`);
+  }
+
+  if (fecha_desde) {
+    params.push(fecha_desde);
+    conditions.push(`created_at::date >= $${params.length}`);
+  }
+
+  if (fecha_hasta) {
+    params.push(fecha_hasta);
+    conditions.push(`created_at::date <= $${params.length}`);
   }
 
   const where = conditions.join(' AND ');
