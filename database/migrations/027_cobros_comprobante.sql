@@ -1,0 +1,1 @@
+ALTER TABLE cobros ADD COLUMN IF NOT EXISTS comprobante_url VARCHAR(255);
