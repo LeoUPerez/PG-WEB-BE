@@ -12,6 +12,8 @@ const DIA_ORDER = `
 
 const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
+const CONTACTO_GIMNASIO = 'contacto@urodfitness.com o al (809) 555-0199';
+
 const findClasesDisponibles = async () => {
   const { rows } = await pool.query(
     `SELECT
@@ -157,7 +159,9 @@ const createReserva = async ({
 
   const cliente = await findClienteByCedula(cedula.trim());
   if (!cliente) {
-    const error = new Error('Debes estar inscrito como cliente del gimnasio para reservar una clase.');
+    const error = new Error(
+      `Debes estar inscrito como cliente del gimnasio para reservar una clase. Si deseas inscribirte o crees que esto es un error, contáctanos: ${CONTACTO_GIMNASIO}.`
+    );
     error.statusCode = 403;
     throw error;
   }
@@ -272,6 +276,13 @@ const cancelarPorToken = async (token) => {
   if (!reserva) return null;
   if (reserva.estado === 'Cancelada') {
     const error = new Error('Esta reserva ya está cancelada.');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (reserva.estado === 'Confirmada') {
+    const error = new Error(
+      `Esta reserva ya fue confirmada y no se puede cancelar desde este enlace. Para cancelarla, contáctanos: ${CONTACTO_GIMNASIO}.`
+    );
     error.statusCode = 400;
     throw error;
   }

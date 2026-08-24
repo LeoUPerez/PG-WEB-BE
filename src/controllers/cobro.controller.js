@@ -1,6 +1,8 @@
 const cobroService = require('../services/cobro.service');
 const { parseListQuery, sendList } = require('../utils/pagination');
 
+const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 const getAll = async (req, res, next) => {
   try {
     const { paginated, page, limit, search } = parseListQuery(req.query);
@@ -8,7 +10,9 @@ const getAll = async (req, res, next) => {
       page,
       limit,
       search,
-      estado: ['Completado', 'Anulado'].includes(req.query.estado) ? req.query.estado : '',
+      estado: ['Pendiente', 'Completado', 'Anulado'].includes(req.query.estado) ? req.query.estado : '',
+      fecha_desde: FECHA_RE.test(req.query.fecha_desde) ? req.query.fecha_desde : '',
+      fecha_hasta: FECHA_RE.test(req.query.fecha_hasta) ? req.query.fecha_hasta : '',
     });
     sendList(res, result, paginated);
   } catch (err) { next(err); }
@@ -38,13 +42,32 @@ const getMetodosPago = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
-    const { cliente_id, metodo_pago_id, cargo_ids } = req.body;
+    const { cliente_id, metodo_pago_id, cargo_ids, estado, email_pago, comprobante_url } = req.body;
     if (!cliente_id || !metodo_pago_id) {
       res.status(400);
       throw new Error('Cliente y método de pago son requeridos');
     }
-    const data = await cobroService.create({ cliente_id, metodo_pago_id, cargo_ids });
+    const data = await cobroService.create({ cliente_id, metodo_pago_id, cargo_ids, estado, email_pago, comprobante_url });
     res.status(201).json({ success: true, data });
+  } catch (err) {
+    if (err.status) res.status(err.status);
+    next(err);
+  }
+};
+
+const getByToken = async (req, res, next) => {
+  try {
+    const data = await cobroService.findByToken(req.params.token);
+    if (!data) { res.status(404); throw new Error('Cobro no encontrado'); }
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+const procesarPago = async (req, res, next) => {
+  try {
+    const data = await cobroService.procesarPago(req.params.token);
+    if (!data) { res.status(404); throw new Error('Cobro no encontrado'); }
+    res.json({ success: true, message: 'Pago procesado', data });
   } catch (err) {
     if (err.status) res.status(err.status);
     next(err);
@@ -62,4 +85,4 @@ const anular = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, getById, getPendientesByCliente, getMetodosPago, create, anular };
+module.exports = { getAll, getById, getByToken, getPendientesByCliente, getMetodosPago, create, procesarPago, anular };
