@@ -18,6 +18,8 @@ const findAll = async ({
   limit = null,
   search = '',
   estado = '',
+  fecha_desde = '',
+  fecha_hasta = '',
 } = {}) => {
   const params = [];
   const conditions = ['TRUE'];
@@ -35,6 +37,16 @@ const findAll = async ({
   if (estado) {
     params.push(estado);
     conditions.push(`co.estado = $${params.length}`);
+  }
+
+  if (fecha_desde) {
+    params.push(fecha_desde);
+    conditions.push(`co.fecha_cobro::date >= $${params.length}`);
+  }
+
+  if (fecha_hasta) {
+    params.push(fecha_hasta);
+    conditions.push(`co.fecha_cobro::date <= $${params.length}`);
   }
 
   return runPagedFind({

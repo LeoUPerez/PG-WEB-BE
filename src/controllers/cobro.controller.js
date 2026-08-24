@@ -1,6 +1,8 @@
 const cobroService = require('../services/cobro.service');
 const { parseListQuery, sendList } = require('../utils/pagination');
 
+const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 const getAll = async (req, res, next) => {
   try {
     const { paginated, page, limit, search } = parseListQuery(req.query);
@@ -9,6 +11,8 @@ const getAll = async (req, res, next) => {
       limit,
       search,
       estado: ['Pendiente', 'Completado', 'Anulado'].includes(req.query.estado) ? req.query.estado : '',
+      fecha_desde: FECHA_RE.test(req.query.fecha_desde) ? req.query.fecha_desde : '',
+      fecha_hasta: FECHA_RE.test(req.query.fecha_hasta) ? req.query.fecha_hasta : '',
     });
     sendList(res, result, paginated);
   } catch (err) { next(err); }

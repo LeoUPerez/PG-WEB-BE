@@ -1,5 +1,7 @@
 const clienteService = require('../services/cliente.service');
 
+const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 const getAll = async (req, res, next) => {
   try {
     const archived = req.query.archived === 'true';
@@ -11,6 +13,8 @@ const getAll = async (req, res, next) => {
       search: String(req.query.search || '').trim(),
       estado: ['Activo', 'Inactivo'].includes(req.query.estado) ? req.query.estado : '',
       sexo: ['M', 'F'].includes(req.query.sexo) ? req.query.sexo : '',
+      fecha_desde: FECHA_RE.test(req.query.fecha_desde) ? req.query.fecha_desde : '',
+      fecha_hasta: FECHA_RE.test(req.query.fecha_hasta) ? req.query.fecha_hasta : '',
     });
 
     if (paginated) {
