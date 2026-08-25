@@ -26,13 +26,12 @@ const createReserva = async (req, res, next) => {
       fecha_clase,
       nombre,
       apellido,
-      cedula,
       email,
       telefono,
       notas,
     } = req.body;
 
-    if (!horario_id || !fecha_clase || !nombre || !apellido || !cedula || !email || !telefono) {
+    if (!horario_id || !fecha_clase || !nombre || !apellido || !email || !telefono) {
       res.status(400);
       throw new Error('Completa todos los campos obligatorios de la reserva.');
     }
@@ -42,7 +41,6 @@ const createReserva = async (req, res, next) => {
       fecha_clase,
       nombre,
       apellido,
-      cedula,
       email,
       telefono,
       notas,

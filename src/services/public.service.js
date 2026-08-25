@@ -110,10 +110,14 @@ const fechaCoincideConDia = (fechaClase, dia) => {
   return DIAS_SEMANA[date.getDay()] === dia;
 };
 
-const findClienteByCedula = async (cedula) => {
+const findClienteByEmail = async (email) => {
   const { rows } = await pool.query(
-    `SELECT id, nombre, apellido, email, telefono FROM clientes WHERE cedula = $1 AND archivado = false LIMIT 1`,
-    [cedula]
+    `SELECT id, nombre, apellido, cedula, email, telefono
+     FROM clientes
+     WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
+       AND archivado = false
+     LIMIT 1`,
+    [email]
   );
   return rows[0] || null;
 };
@@ -130,7 +134,6 @@ const createReserva = async ({
   fecha_clase,
   nombre,
   apellido,
-  cedula,
   email,
   telefono,
   notas = null,
@@ -157,7 +160,15 @@ const createReserva = async ({
     throw error;
   }
 
-  const cliente = await findClienteByCedula(cedula.trim());
+  const emailNorm = String(email || '').trim();
+  const telefonoNorm = String(telefono || '').trim();
+  if (!emailNorm || !telefonoNorm) {
+    const error = new Error('Correo y teléfono son obligatorios.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const cliente = await findClienteByEmail(emailNorm);
   if (!cliente) {
     const error = new Error(
       `Debes estar inscrito como cliente del gimnasio para reservar una clase. Si deseas inscribirte o crees que esto es un error, contáctanos: ${CONTACTO_GIMNASIO}.`
@@ -169,7 +180,7 @@ const createReserva = async ({
     normalizarTexto(cliente.nombre) !== normalizarTexto(nombre) ||
     normalizarTexto(cliente.apellido) !== normalizarTexto(apellido)
   ) {
-    const error = new Error('El nombre y apellido no coinciden con el cliente registrado con esta cédula.');
+    const error = new Error('El nombre y apellido no coinciden con el cliente registrado con este correo.');
     error.statusCode = 403;
     throw error;
   }
@@ -196,9 +207,9 @@ const createReserva = async ({
         fecha_clase,
         cliente.nombre,
         cliente.apellido,
-        cedula.trim(),
-        cliente.email,
-        cliente.telefono,
+        cliente.cedula,
+        cliente.email || emailNorm,
+        telefonoNorm,
         notas?.trim() || null,
         clienteId,
         token,
@@ -216,7 +227,7 @@ const createReserva = async ({
   const link = `${(process.env.FRONTEND_URL || '').replace(/\/$/, '')}/confirmar_reserva.php?token=${token}`;
   try {
     await emailService.enviarConfirmacionReserva({
-      destinatario: cliente.email,
+      destinatario: cliente.email || emailNorm,
       nombre: cliente.nombre,
       clase: horario.nombre,
       dia: horario.dia,
