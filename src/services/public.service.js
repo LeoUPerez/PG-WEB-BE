@@ -217,8 +217,34 @@ const createReserva = async ({
     ));
   } catch (err) {
     if (err.code === '23505' && err.constraint === 'uq_reservas_clases_slot_activa') {
-      const error = new Error('Ya tienes una reserva pendiente o confirmada para esta clase en esta fecha.');
+      const { rows: existentes } = await pool.query(
+        `SELECT id, token
+         FROM reservas_clases
+         WHERE horario_id = $1
+           AND fecha_clase = $2
+           AND cedula = $3
+           AND estado <> 'Cancelada'
+         ORDER BY id DESC
+         LIMIT 1`,
+        [horario_id, fecha_clase, cliente.cedula]
+      );
+      let tokenExistente = existentes[0]?.token || null;
+      if (existentes[0] && !tokenExistente) {
+        tokenExistente = crypto.randomBytes(32).toString('hex');
+        await pool.query(
+          'UPDATE reservas_clases SET token = $1, updated_at = NOW() WHERE id = $2',
+          [tokenExistente, existentes[0].id]
+        );
+      }
+      const baseUrl = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
+      const error = new Error('Existe una reserva pendiente o confirmada para esta clase en esta fecha.');
       error.statusCode = 409;
+      if (tokenExistente && baseUrl) {
+        error.data = {
+          link: `${baseUrl}/confirmar_reserva.php?token=${tokenExistente}`,
+          token: tokenExistente,
+        };
+      }
       throw error;
     }
     throw err;
