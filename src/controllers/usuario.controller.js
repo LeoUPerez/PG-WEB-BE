@@ -29,7 +29,7 @@ const update = async (req, res, next) => {
     const { password_actual, password_nueva, ...fields } = req.body;
 
     if (password_nueva) {
-      const existing = await usuarioService.findByUsername(fields.usuario);
+      const existing = await usuarioService.findByIdWithPassword(req.params.id);
       if (!existing) { res.status(404); throw new Error('Usuario no encontrado'); }
 
       const valid = await bcrypt.compare(password_actual, existing.password);

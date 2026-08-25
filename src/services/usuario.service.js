@@ -33,6 +33,15 @@ const findByUsername = async (username) => {
   return rows[0] || null;
 };
 
+const findByIdWithPassword = async (id) => {
+  // Includes password hash — only for auth use
+  const { rows } = await pool.query(
+    'SELECT * FROM usuarios WHERE id = $1',
+    [id]
+  );
+  return rows[0] || null;
+};
+
 const create = async ({ usuario, nombre, email, password, rol, estado = true }) => {
   const hash = await bcrypt.hash(password, SALT_ROUNDS);
   const { rows } = await pool.query(
@@ -97,6 +106,7 @@ module.exports = {
   findAll,
   findById,
   findByUsername,
+  findByIdWithPassword,
   create,
   update,
   changePassword,
