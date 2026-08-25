@@ -4,7 +4,7 @@ const cobroPagoEmailHtml = ({ nombre, numeroCobro, lineas, montoTotal, link }) =
       (l) => `
       <tr>
         <td style="padding:10px 0;font-size:13px;color:#C7CEDA;border-bottom:1px solid rgba(255,255,255,0.06);">${l.concepto}</td>
-        <td align="right" style="padding:10px 0;font-size:13px;color:#FFFFFF;font-weight:700;border-bottom:1px solid rgba(255,255,255,0.06);">$${Number(l.monto).toFixed(2)}</td>
+        <td align="right" style="padding:10px 0;font-size:13px;color:#FFFFFF;font-weight:700;border-bottom:1px solid rgba(255,255,255,0.06);">RD$${Number(l.monto).toFixed(2)}</td>
       </tr>`
     )
     .join('');
@@ -45,7 +45,7 @@ const cobroPagoEmailHtml = ({ nombre, numeroCobro, lineas, montoTotal, link }) =
                 ${filas}
                 <tr>
                   <td style="padding:14px 0 4px;font-size:13px;font-weight:700;color:#F2B705;text-transform:uppercase;letter-spacing:0.5px;">Total</td>
-                  <td align="right" style="padding:14px 0 4px;font-size:18px;font-weight:800;color:#F2B705;">$${Number(montoTotal).toFixed(2)}</td>
+                  <td align="right" style="padding:14px 0 4px;font-size:18px;font-weight:800;color:#F2B705;">RD$${Number(montoTotal).toFixed(2)}</td>
                 </tr>
               </table>
             </td>
@@ -81,12 +81,12 @@ const cobroPagoEmailHtml = ({ nombre, numeroCobro, lineas, montoTotal, link }) =
 };
 
 const cobroPagoEmailText = ({ nombre, numeroCobro, lineas, montoTotal, link }) => {
-  const filas = (lineas || []).map((l) => `- ${l.concepto}: $${Number(l.monto).toFixed(2)}`).join('\n');
+  const filas = (lineas || []).map((l) => `- ${l.concepto}: RD$${Number(l.monto).toFixed(2)}`).join('\n');
   return (
     `Hola${nombre ? ' ' + nombre : ''},\n\n` +
     `Tienes una cotización lista para pagar con tarjeta. Cobro ${numeroCobro}.\n\n` +
     `${filas}\n\n` +
-    `Total: $${Number(montoTotal).toFixed(2)}\n\n` +
+    `Total: RD$${Number(montoTotal).toFixed(2)}\n\n` +
     `Paga aquí: ${link}\n\n` +
     `Si no reconoces este cobro, ignora este correo.\n\n` +
     `U-ROD · Sistema de Gestión`
