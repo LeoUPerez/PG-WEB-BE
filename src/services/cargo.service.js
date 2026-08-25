@@ -91,12 +91,19 @@ const create = async ({ cliente_id }) => {
     const err = new Error('Este cliente no tiene una membresía activa asignada'); err.status = 400; throw err;
   }
 
-  const { rows: pendienteRows } = await pool.query(
-    `SELECT id FROM cargos WHERE cliente_membresia_id = $1 AND estado = 'Pendiente'`,
+  const { rows: existentesRows } = await pool.query(
+    `SELECT id, estado FROM cargos WHERE cliente_membresia_id = $1`,
     [membresia.id]
   );
-  if (pendienteRows.length > 0) {
-    const err = new Error('Ya existe un cargo pendiente para esta membresía'); err.status = 400; throw err;
+  if (existentesRows.length > 0) {
+    const yaPagado = existentesRows.some((c) => c.estado === 'Pagado');
+    const err = new Error(
+      yaPagado
+        ? 'Esta membresía ya fue facturada y pagada; no se puede generar otro cargo para el mismo ciclo'
+        : 'Ya existe un cargo pendiente para esta membresía'
+    );
+    err.status = 400;
+    throw err;
   }
 
   const { rows: seqRows } = await pool.query("SELECT nextval('cargos_id_seq') AS id");

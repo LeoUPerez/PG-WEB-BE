@@ -101,6 +101,12 @@ const findPendientesByCliente = async (clienteId) => {
     `SELECT id, numero_cargo, concepto, monto, fecha_vencimiento
      FROM cargos
      WHERE cliente_id = $1 AND estado = 'Pendiente'
+       AND NOT EXISTS (SELECT 1 FROM abonos a WHERE a.cargo_id = cargos.id)
+       AND NOT EXISTS (
+         SELECT 1 FROM cobro_detalle cd
+         JOIN cobros co ON co.id = cd.cobro_id
+         WHERE cd.cargo_id = cargos.id AND co.estado = 'Pendiente'
+       )
      ORDER BY fecha_vencimiento ASC`,
     [clienteId]
   );
@@ -146,11 +152,18 @@ const create = async ({
   }
 
   const { rows: cargoRows } = await pool.query(
-    `SELECT * FROM cargos WHERE id = ANY($1::int[]) AND cliente_id = $2 AND estado = 'Pendiente'`,
+    `SELECT * FROM cargos
+     WHERE id = ANY($1::int[]) AND cliente_id = $2 AND estado = 'Pendiente'
+       AND NOT EXISTS (SELECT 1 FROM abonos a WHERE a.cargo_id = cargos.id)
+       AND NOT EXISTS (
+         SELECT 1 FROM cobro_detalle cd
+         JOIN cobros co ON co.id = cd.cobro_id
+         WHERE cd.cargo_id = cargos.id AND co.estado = 'Pendiente'
+       )`,
     [cargo_ids, cliente_id]
   );
   if (cargoRows.length !== cargo_ids.length) {
-    const err = new Error('Uno o más cargos ya no están pendientes'); err.status = 400; throw err;
+    const err = new Error('Uno o más cargos ya no están disponibles (pagados, con abonos parciales, o con una cotización de pago pendiente)'); err.status = 400; throw err;
   }
 
   const montoTotal = cargoRows.reduce((sum, c) => sum + Number(c.monto), 0);

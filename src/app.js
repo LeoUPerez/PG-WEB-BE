@@ -27,6 +27,7 @@ const compraRoutes = require('./routes/compra.routes');
 const ventaRoutes = require('./routes/venta.routes');
 const metodoPagoRoutes = require('./routes/metodoPago.routes');
 const asistenciaRoutes = require('./routes/asistencia.routes');
+const abonoRoutes = require('./routes/abono.routes');
 
 const app = express();
 
@@ -62,6 +63,7 @@ app.use('/api/compras', compraRoutes);
 app.use('/api/ventas', ventaRoutes);
 app.use('/api/metodos-pago', metodoPagoRoutes);
 app.use('/api/asistencias', asistenciaRoutes);
+app.use('/api/abonos', abonoRoutes);
 
 // --- Error handling (must be last) ---
 app.use(notFound);

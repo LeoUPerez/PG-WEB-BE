@@ -110,6 +110,8 @@ const findAll = async ({
   limit = null,
   search = '',
   estado = '',
+  fecha_desde = '',
+  fecha_hasta = '',
 } = {}) => {
   const params = [];
   const conditions = ['TRUE'];
@@ -129,6 +131,16 @@ const findAll = async ({
   if (estado && ESTADOS_FILTRO.includes(estado)) {
     params.push(estado);
     conditions.push(`v.estado = $${params.length}`);
+  }
+
+  if (fecha_desde) {
+    params.push(fecha_desde);
+    conditions.push(`v.created_at::date >= $${params.length}`);
+  }
+
+  if (fecha_hasta) {
+    params.push(fecha_hasta);
+    conditions.push(`v.created_at::date <= $${params.length}`);
   }
 
   return runPagedFind({

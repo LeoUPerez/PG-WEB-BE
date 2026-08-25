@@ -1,13 +1,17 @@
 const ventaService = require('../services/venta.service');
 const { parseListQuery, sendList } = require('../utils/pagination');
 
+const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 const getAll = async (req, res, next) => {
   try {
     const { paginated, page, limit, search } = parseListQuery(req.query);
     const estado = ['Pendiente', 'Pagada', 'Anulada', 'Entregada'].includes(req.query.estado)
       ? req.query.estado
       : '';
-    const result = await ventaService.findAll({ page, limit, search, estado });
+    const fecha_desde = FECHA_RE.test(req.query.fecha_desde || '') ? req.query.fecha_desde : '';
+    const fecha_hasta = FECHA_RE.test(req.query.fecha_hasta || '') ? req.query.fecha_hasta : '';
+    const result = await ventaService.findAll({ page, limit, search, estado, fecha_desde, fecha_hasta });
     sendList(res, result, paginated);
   } catch (err) {
     next(err);
