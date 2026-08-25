@@ -9,6 +9,16 @@ const getClasesDisponibles = async (req, res, next) => {
   }
 };
 
+const getProductosPublicos = async (req, res, next) => {
+  try {
+    const categoria_id = req.query.categoria_id || '';
+    const data = await publicService.findProductosPublicos({ categoria_id });
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const createReserva = async (req, res, next) => {
   try {
     const {
@@ -16,13 +26,12 @@ const createReserva = async (req, res, next) => {
       fecha_clase,
       nombre,
       apellido,
-      cedula,
       email,
       telefono,
       notas,
     } = req.body;
 
-    if (!horario_id || !fecha_clase || !nombre || !apellido || !cedula || !email || !telefono) {
+    if (!horario_id || !fecha_clase || !nombre || !apellido || !email || !telefono) {
       res.status(400);
       throw new Error('Completa todos los campos obligatorios de la reserva.');
     }
@@ -32,7 +41,6 @@ const createReserva = async (req, res, next) => {
       fecha_clase,
       nombre,
       apellido,
-      cedula,
       email,
       telefono,
       notas,
@@ -81,8 +89,81 @@ const cancelarReservaPorToken = async (req, res, next) => {
   }
 };
 
+const createVentaPublica = async (req, res, next) => {
+  try {
+    const data = await publicService.createVentaPublica(req.body || {});
+    const pagada = data.estado === 'Pagada';
+    res.status(201).json({
+      success: true,
+      message: pagada
+        ? 'Pago simulado aprobado. Revisa tu correo con el número de tracking.'
+        : 'Pedido registrado. Paga en recepción; te enviamos el tracking por correo.',
+      data,
+    });
+  } catch (err) {
+    if (err.statusCode || err.status) res.status(err.statusCode || err.status);
+    next(err);
+  }
+};
+
+const pagarVentaSimulada = async (req, res, next) => {
+  try {
+    const data = await publicService.pagarVentaSimulada(req.params.token, req.body || {});
+    res.json({
+      success: true,
+      message: 'Pago simulado aprobado.',
+      data,
+    });
+  } catch (err) {
+    if (err.statusCode || err.status) res.status(err.statusCode || err.status);
+    next(err);
+  }
+};
+
+const getVentaTracking = async (req, res, next) => {
+  try {
+    const data = await publicService.findVentaTracking(req.query.q);
+    if (!data) {
+      res.status(404);
+      throw new Error('No encontramos un pedido con ese número de tracking.');
+    }
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const getCiudadesEntrega = async (req, res, next) => {
+  try {
+    const data = await publicService.findCiudadesEntrega();
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const createSolicitudCobertura = async (req, res, next) => {
+  try {
+    const data = await publicService.createSolicitudCobertura(req.body || {});
+    res.status(201).json({
+      success: true,
+      message: 'Solicitud registrada. Te avisaremos cuando haya cobertura en esa ciudad.',
+      data,
+    });
+  } catch (err) {
+    if (err.statusCode || err.status) res.status(err.statusCode || err.status);
+    next(err);
+  }
+};
+
 module.exports = {
   getClasesDisponibles,
+  getProductosPublicos,
+  getCiudadesEntrega,
+  createSolicitudCobertura,
+  createVentaPublica,
+  pagarVentaSimulada,
+  getVentaTracking,
   createReserva,
   getReservaPorToken,
   confirmarReservaPorToken,
