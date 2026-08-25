@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
+const { evaluarTarjetaSimulada } = require('../utils/tarjetaSimulada');
 const { runPagedFind } = require('../utils/pagination');
 const emailService = require('./email.service');
 
@@ -225,7 +226,14 @@ const create = async ({
   return cobro;
 };
 
-const procesarPago = async (token) => {
+const procesarPago = async (token, { tarjeta_numero = '' } = {}) => {
+  const pagoSim = evaluarTarjetaSimulada(tarjeta_numero);
+  if (!pagoSim.aprobada) {
+    const err = new Error(pagoSim.mensaje || 'Pago rechazado.');
+    err.status = 402;
+    throw err;
+  }
+
   const client = await pool.connect();
   let cobroId = null;
   try {

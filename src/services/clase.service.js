@@ -50,17 +50,17 @@ const findById = async (id) => {
   return rows[0] || null;
 };
 
-const create = async ({ nombre, descripcion, capacidad, duracion_minutos, estado = 'Activo' }) => {
+const create = async ({ nombre, descripcion, capacidad, duracion_minutos, estado = 'Activo', imagen = null }) => {
   const { rows } = await pool.query(
-    `INSERT INTO clases (nombre, descripcion, capacidad, duracion_minutos, estado, archivado)
-     VALUES ($1, $2, $3, $4, $5, false)
+    `INSERT INTO clases (nombre, descripcion, capacidad, duracion_minutos, estado, imagen, archivado)
+     VALUES ($1, $2, $3, $4, $5, $6, false)
      RETURNING *`,
-    [nombre, descripcion || null, capacidad, duracion_minutos, estado]
+    [nombre, descripcion || null, capacidad, duracion_minutos, estado, imagen || null]
   );
   return rows[0];
 };
 
-const update = async (id, { nombre, descripcion, capacidad, duracion_minutos, estado }) => {
+const update = async (id, { nombre, descripcion, capacidad, duracion_minutos, estado, imagen = null }) => {
   if (estado === 'Activo' && !(await tieneSalonAsignado(id))) {
     throw httpError('No puedes activar la clase sin un salón asignado en el horario.');
   }
@@ -87,10 +87,10 @@ const update = async (id, { nombre, descripcion, capacidad, duracion_minutos, es
   const { rows } = await pool.query(
     `UPDATE clases
      SET nombre = $1, descripcion = $2, capacidad = $3,
-         duracion_minutos = $4, estado = $5, updated_at = NOW()
-     WHERE id = $6
+         duracion_minutos = $4, estado = $5, imagen = $6, updated_at = NOW()
+     WHERE id = $7
      RETURNING *`,
-    [nombre, descripcion || null, capacidad, duracion_minutos, estado, id]
+    [nombre, descripcion || null, capacidad, duracion_minutos, estado, imagen || null, id]
   );
   return rows[0] || null;
 };

@@ -65,7 +65,7 @@ const getByToken = async (req, res, next) => {
 
 const procesarPago = async (req, res, next) => {
   try {
-    const data = await cobroService.procesarPago(req.params.token);
+    const data = await cobroService.procesarPago(req.params.token, req.body || {});
     if (!data) { res.status(404); throw new Error('Cobro no encontrado'); }
     res.json({ success: true, message: 'Pago procesado', data });
   } catch (err) {

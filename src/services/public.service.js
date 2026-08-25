@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
+const { evaluarTarjetaSimulada } = require('../utils/tarjetaSimulada');
 const emailService = require('./email.service');
 
 const DIA_ORDER = `
@@ -438,48 +439,6 @@ const createSolicitudCobertura = async ({
     ]
   );
   return rows[0];
-};
-
-/** Simulación de tarjeta: solo números de prueba. Nunca persistir PAN/CVV. */
-const evaluarTarjetaSimulada = (numeroTarjeta) => {
-  const digits = String(numeroTarjeta || '').replace(/\D/g, '');
-  if (digits.length < 13 || digits.length > 19) {
-    return {
-      aprobada: false,
-      mensaje: 'Número de tarjeta inválido. Usa una tarjeta de prueba (ej. 4242 4242 4242 4242).',
-    };
-  }
-
-  let brand = 'Card';
-  if (/^4/.test(digits)) brand = 'Visa';
-  else if (/^(5[1-5]|2[2-7])/.test(digits)) brand = 'Mastercard';
-  else if (/^3[47]/.test(digits)) brand = 'Amex';
-
-  const last4 = digits.slice(-4);
-  // Rechazo fijo (estilo Stripe test)
-  if (digits === '4000000000000002') {
-    return {
-      aprobada: false,
-      brand,
-      last4,
-      mensaje: 'Pago rechazado por el banco (tarjeta de prueba de rechazo).',
-    };
-  }
-  // Éxito: Visa de prueba 4242… u otras que no estén en lista de rechazo
-  if (digits === '4242424242424242' || digits.startsWith('4242')) {
-    return { aprobada: true, brand, last4 };
-  }
-  // Otras marcas de prueba comunes
-  if (digits === '5555555555554444' || digits === '378282246310005') {
-    return { aprobada: true, brand, last4 };
-  }
-
-  return {
-    aprobada: false,
-    brand,
-    last4,
-    mensaje: 'Usa una tarjeta de prueba: 4242 4242 4242 4242 (éxito) o 4000 0000 0000 0002 (rechazo).',
-  };
 };
 
 const createVentaPublica = async (payload) => {

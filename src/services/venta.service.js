@@ -2,8 +2,30 @@ const crypto = require('crypto');
 const pool = require('../config/db');
 const { runPagedFind } = require('../utils/pagination');
 
-const METODOS_PAGO_CONFIRMACION = ['Efectivo', 'Tarjeta', 'Transferencia'];
+const METODOS_PAGO_SISTEMA = ['PendienteRecepcion', 'SimuladoTarjeta'];
 const ESTADOS_FILTRO = ['Pendiente', 'Pagada', 'Anulada', 'Entregada'];
+
+/** Métodos de recepción/confirmación: mismos activos que Cobros (tabla metodos_pago). */
+const assertMetodoPagoActivo = async (nombre) => {
+  const metodo = String(nombre || '').trim();
+  if (!metodo) {
+    const err = new Error('Selecciona un método de pago válido');
+    err.status = 400;
+    throw err;
+  }
+  if (METODOS_PAGO_SISTEMA.includes(metodo)) return metodo;
+
+  const { rows } = await pool.query(
+    `SELECT nombre FROM metodos_pago WHERE nombre = $1 AND estado = 'Activo' LIMIT 1`,
+    [metodo]
+  );
+  if (!rows[0]) {
+    const err = new Error('El método de pago no está disponible o está inactivo');
+    err.status = 400;
+    throw err;
+  }
+  return rows[0].nombre;
+};
 
 const componerDireccion = ({
   ciudad_nombre = null,
@@ -362,10 +384,8 @@ const create = async ({
   let metodo = metodo_pago;
   if (estado === 'Pendiente') {
     metodo = 'PendienteRecepcion';
-  } else if (!METODOS_PAGO_CONFIRMACION.includes(metodo) && metodo !== 'SimuladoTarjeta') {
-    const err = new Error('Selecciona un método de pago válido');
-    err.status = 400;
-    throw err;
+  } else {
+    metodo = await assertMetodoPagoActivo(metodo);
   }
 
   const { lineas, total } = await buildLineas(detalle);
@@ -502,11 +522,7 @@ const marcarPagada = async (id, metodo_pago) => {
 };
 
 const confirmarPago = async (id, { metodo_pago }) => {
-  if (!METODOS_PAGO_CONFIRMACION.includes(metodo_pago)) {
-    const err = new Error('Método de pago inválido');
-    err.status = 400;
-    throw err;
-  }
+  const metodo = await assertMetodoPagoActivo(metodo_pago);
 
   const { rows: peek } = await pool.query('SELECT estado, metodo_pago FROM ventas WHERE id = $1', [id]);
   if (!peek[0]) return null;
@@ -521,7 +537,7 @@ const confirmarPago = async (id, { metodo_pago }) => {
     throw err;
   }
 
-  return marcarPagada(id, metodo_pago);
+  return marcarPagada(id, metodo);
 };
 
 /** Marca Pagada con método SimuladoTarjeta (checkout público). */

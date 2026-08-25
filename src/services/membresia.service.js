@@ -2,9 +2,32 @@ const pool = require('../config/db');
 const { runPagedFind } = require('../utils/pagination');
 
 const SELECT_COLS = `
-  id, nombre, descripcion, duracion_dias, precio,
+  id, nombre, descripcion, beneficios, duracion_dias, precio,
   estado, destacado, archivado, created_at, updated_at
 `;
+
+const normalizeBeneficios = (beneficios) => {
+  if (!Array.isArray(beneficios)) return [];
+  return beneficios
+    .map((b) => String(b ?? '').trim())
+    .filter((b) => b !== '');
+};
+
+const assertMembresiaPayload = ({ descripcion, beneficios }) => {
+  const desc = String(descripcion ?? '').trim();
+  if (!desc) {
+    const err = new Error('La descripción es obligatoria.');
+    err.status = 400;
+    throw err;
+  }
+  const list = normalizeBeneficios(beneficios);
+  if (list.length === 0) {
+    const err = new Error('Agrega al menos un beneficio.');
+    err.status = 400;
+    throw err;
+  }
+  return { descripcion: desc, beneficios: list };
+};
 
 const findAll = async ({
   archived = false,
@@ -18,7 +41,11 @@ const findAll = async ({
 
   if (search) {
     params.push(`%${search}%`);
-    conditions.push(`(nombre ILIKE $${params.length} OR descripcion ILIKE $${params.length})`);
+    conditions.push(`(
+      nombre ILIKE $${params.length}
+      OR descripcion ILIKE $${params.length}
+      OR beneficios::text ILIKE $${params.length}
+    )`);
   }
 
   if (estado) {
@@ -53,17 +80,27 @@ const findById = async (id) => {
 const create = async ({
   nombre,
   descripcion,
+  beneficios,
   duracion_dias,
   precio = 0,
   estado = 'Activo',
   destacado = false,
 }) => {
+  const cleaned = assertMembresiaPayload({ descripcion, beneficios });
   const { rows } = await pool.query(
     `INSERT INTO membresias
-       (nombre, descripcion, duracion_dias, precio, estado, destacado, archivado)
-     VALUES ($1, $2, $3, $4, $5, $6, false)
+       (nombre, descripcion, beneficios, duracion_dias, precio, estado, destacado, archivado)
+     VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, false)
      RETURNING ${SELECT_COLS}`,
-    [nombre, descripcion || null, duracion_dias, precio, estado, !!destacado]
+    [
+      nombre,
+      cleaned.descripcion,
+      JSON.stringify(cleaned.beneficios),
+      duracion_dias,
+      precio,
+      estado,
+      !!destacado,
+    ]
   );
   return rows[0];
 };
@@ -71,18 +108,42 @@ const create = async ({
 const update = async (id, {
   nombre,
   descripcion,
+  beneficios,
   duracion_dias,
   precio,
   estado,
   destacado = false,
 }) => {
+  const desc = String(descripcion ?? '').trim();
+  if (!desc) {
+    const err = new Error('La descripción es obligatoria.');
+    err.status = 400;
+    throw err;
+  }
+
+  let list = normalizeBeneficios(beneficios);
+  if (list.length === 0) {
+    const current = await findById(id);
+    if (!current) return null;
+    list = normalizeBeneficios(current.beneficios);
+  }
+
   const { rows } = await pool.query(
     `UPDATE membresias
-     SET nombre = $1, descripcion = $2, duracion_dias = $3,
-         precio = $4, estado = $5, destacado = $6, updated_at = NOW()
-     WHERE id = $7
+     SET nombre = $1, descripcion = $2, beneficios = $3::jsonb, duracion_dias = $4,
+         precio = $5, estado = $6, destacado = $7, updated_at = NOW()
+     WHERE id = $8
      RETURNING ${SELECT_COLS}`,
-    [nombre, descripcion || null, duracion_dias, precio, estado, !!destacado, id]
+    [
+      nombre,
+      desc,
+      JSON.stringify(list),
+      duracion_dias,
+      precio,
+      estado,
+      !!destacado,
+      id,
+    ]
   );
   return rows[0] || null;
 };
